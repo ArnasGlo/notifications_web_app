@@ -26,19 +26,7 @@ class User extends Authenticatable
         return $this->hasMany(Delegate::class, 'assistant_user_id');
     }
 
-    /**
-     * All numbers this user can manage: owned + delegated.
-     * Returns a collection of Number models.
-     */
-    public function accessibleNumbers()
-    {
-        $ownIds = $this->numbers()->pluck('id');
-        $delegatedIds = $this->delegations()->pluck('number_id');
-        $allIds = $ownIds->merge($delegatedIds)->unique()->values();
-
-        return Number::whereIn('id', $allIds)->get();
-    }
-
+    /** All number IDs this user can manage: owned + delegated. */
     public function accessibleNumberIds()
     {
         $ownIds = $this->numbers()->pluck('id');
