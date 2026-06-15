@@ -9,9 +9,9 @@ class DatabaseSeeder extends Seeder
 {
     public function run(): void
     {
-        User::firstOrCreate(
+        User::updateOrCreate(
             ['email' => 'user@example.com'],
-            ['name' => 'User', 'password' => bcrypt('your-secure-password')]
+            ['name' => 'User', 'password' => bcrypt('password123')]
         );
 
         $this->call(MessageCategorySeeder::class);
