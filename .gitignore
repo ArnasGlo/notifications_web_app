@@ -16,3 +16,9 @@ yarn-error.log
 /.fleet
 /.idea
 /.vscode
+
+# Internal planning/context docs for Claude Code — never push to a public repo.
+/CLAUDE.md
+/ANDROID_APP_CONTEXT.md
+/PHASE0_PROGRESS.md
+/android_project_plan.md
