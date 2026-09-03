@@ -25,4 +25,9 @@ Route::middleware('auth:sanctum')->group(function () {
     });
 
     Route::get('/numbers/search', [NumberController::class, 'lookup']);
+
+    Route::get('/numbers', [NumberController::class, 'index']);
+    Route::post('/numbers', [NumberController::class, 'store']);
+    Route::patch('/numbers/{number}', [NumberController::class, 'update']);
+    Route::delete('/numbers/{number}', [NumberController::class, 'destroy']);
 });
