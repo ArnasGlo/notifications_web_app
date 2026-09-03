@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\DelegateController;
+use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\NumberController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -34,4 +35,7 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/numbers/{number}/delegates', [DelegateController::class, 'index']);
     Route::delete('/numbers/{number}/delegates/{delegate}', [DelegateController::class, 'destroy']);
+
+    Route::get('/invite/{token}', [InviteController::class, 'show']);
+    Route::post('/invite/{token}/accept', [InviteController::class, 'accept']);
 });
