@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\DelegateController;
 use App\Http\Controllers\Api\NumberController;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
@@ -30,4 +31,7 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/numbers', [NumberController::class, 'store']);
     Route::patch('/numbers/{number}', [NumberController::class, 'update']);
     Route::delete('/numbers/{number}', [NumberController::class, 'destroy']);
+
+    Route::get('/numbers/{number}/delegates', [DelegateController::class, 'index']);
+    Route::delete('/numbers/{number}/delegates/{delegate}', [DelegateController::class, 'destroy']);
 });
