@@ -2,11 +2,14 @@
 
 namespace App\Models;
 
+use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 
 class Message extends Model
 {
-    protected $fillable = ['sender_number_id', 'receiver_number_id', 'template_id', 'parent_id', 'status'];
+    use HasFactory;
+
+    protected $fillable = ['sender_number_id', 'receiver_number_id', 'template_id', 'parent_id', 'status', 'read_at'];
     public function sender() { return $this->belongsTo(Number::class, 'sender_number_id'); }
     public function receiver() { return $this->belongsTo(Number::class, 'receiver_number_id'); }
     public function template() { return $this->belongsTo(MessageTemplate::class); }

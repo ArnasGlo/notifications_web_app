@@ -4,7 +4,9 @@ use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DelegateController;
 use App\Http\Controllers\Api\InviteController;
+use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NumberController;
+use App\Http\Controllers\Api\StatusController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -39,6 +41,16 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/numbers/{number}/blocks', [BlockController::class, 'index']);
     Route::post('/numbers/{number}/blocks', [BlockController::class, 'store']);
     Route::delete('/numbers/{number}/blocks/{block}', [BlockController::class, 'destroy']);
+
+    Route::get('/numbers/{number}/messages', [MessageController::class, 'numberInbox']);
+
+    Route::get('/messages/compose-data', [MessageController::class, 'composeData']);
+    Route::get('/messages', [MessageController::class, 'index']);
+    Route::post('/messages', [MessageController::class, 'store']);
+    Route::get('/messages/{message}', [MessageController::class, 'show']);
+    Route::post('/messages/{message}/reply', [MessageController::class, 'reply']);
+
+    Route::patch('/status', [StatusController::class, 'update']);
 
     Route::post('/invite/{token}/accept', [InviteController::class, 'accept']);
 });
