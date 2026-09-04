@@ -120,6 +120,23 @@ class NumberCrudTest extends TestCase
         $this->assertDatabaseHas('numbers', ['id' => $number->id, 'status' => 'inactive']);
     }
 
+    public function test_update_cannot_change_the_number_itself(): void
+    {
+        $user = User::factory()->create();
+        $number = Number::factory()->for($user)->create(['number' => '+37060011111']);
+
+        $this->actingAs($user, 'sanctum')
+            ->patchJson("/api/numbers/{$number->id}", [
+                'number' => '+37060099999',
+                'city' => 'Kaunas',
+            ])
+            ->assertStatus(200)
+            ->assertJsonPath('data.number', '+37060011111')
+            ->assertJsonPath('data.city', 'Kaunas');
+
+        $this->assertDatabaseHas('numbers', ['id' => $number->id, 'number' => '+37060011111']);
+    }
+
     public function test_update_rejects_an_invalid_status(): void
     {
         $user = User::factory()->create();

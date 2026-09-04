@@ -12,13 +12,24 @@ class InviteTest extends TestCase
 {
     use RefreshDatabase;
 
+    /**
+     * The invite lookup route is public (no auth:sanctum), so nothing calls
+     * Auth::shouldUse('sanctum') for it. These tests therefore authenticate with a
+     * real bearer token rather than actingAs(), which would swap the default guard
+     * process-wide and mask a wrong-guard bug in InviteResource.
+     */
+    private function bearer(User $user): static
+    {
+        return $this->withHeader('Authorization', 'Bearer '.$user->createToken('android')->plainTextToken);
+    }
+
     public function test_show_returns_the_number_for_a_new_user(): void
     {
         $owner = User::factory()->create(['name' => 'Owner Name']);
         $newUser = User::factory()->create();
         $number = Number::factory()->for($owner)->create();
 
-        $response = $this->actingAs($newUser, 'sanctum')->getJson("/api/invite/{$number->share_token}");
+        $response = $this->bearer($newUser)->getJson("/api/invite/{$number->share_token}");
 
         $response->assertStatus(200)
             ->assertJsonPath('data.number.id', $number->id)
@@ -33,7 +44,7 @@ class InviteTest extends TestCase
         $owner = User::factory()->create();
         $number = Number::factory()->for($owner)->create();
 
-        $this->actingAs($owner, 'sanctum')
+        $this->bearer($owner)
             ->getJson("/api/invite/{$number->share_token}")
             ->assertStatus(200)
             ->assertJsonPath('data.is_owner', true)
@@ -47,7 +58,7 @@ class InviteTest extends TestCase
         $number = Number::factory()->for($owner)->create();
         Delegate::create(['number_id' => $number->id, 'assistant_user_id' => $assistant->id]);
 
-        $this->actingAs($assistant, 'sanctum')
+        $this->bearer($assistant)
             ->getJson("/api/invite/{$number->share_token}")
             ->assertStatus(200)
             ->assertJsonPath('data.is_owner', false)

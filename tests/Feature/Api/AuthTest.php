@@ -64,4 +64,38 @@ class AuthTest extends TestCase
     {
         $this->postJson('/api/logout')->assertStatus(401);
     }
+
+    public function test_user_endpoint_returns_the_wrapped_resource_without_internal_fields(): void
+    {
+        $user = User::factory()->create(['name' => 'Test User', 'status' => 'busy']);
+        $token = $user->createToken('android')->plainTextToken;
+
+        $response = $this->withHeader('Authorization', "Bearer {$token}")->getJson('/api/user');
+
+        $response->assertStatus(200)
+            ->assertJsonPath('data.id', $user->id)
+            ->assertJsonPath('data.name', 'Test User')
+            ->assertJsonPath('data.email', $user->email)
+            ->assertJsonPath('data.status', 'busy')
+            ->assertJsonMissingPath('data.is_admin')
+            ->assertJsonMissingPath('data.password')
+            ->assertJsonMissingPath('data.email_verified_at');
+    }
+
+    public function test_login_is_rate_limited_after_five_failed_attempts(): void
+    {
+        $user = User::factory()->create();
+
+        for ($i = 0; $i < 5; $i++) {
+            $this->postJson('/api/login', [
+                'email' => $user->email,
+                'password' => 'wrong-password',
+            ])->assertStatus(422);
+        }
+
+        $this->postJson('/api/login', [
+            'email' => $user->email,
+            'password' => 'wrong-password',
+        ])->assertStatus(429);
+    }
 }

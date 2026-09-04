@@ -12,7 +12,10 @@ class InviteResource extends JsonResource
      */
     public function toArray(Request $request): array
     {
-        $user = $request->user();
+        // This resource is served from a public route (no auth:sanctum), so nothing has
+        // called Auth::shouldUse('sanctum') — a bare $request->user() would resolve the
+        // default 'web' session guard and always return null for a bearer token.
+        $user = $request->user('sanctum');
 
         return [
             'number' => [

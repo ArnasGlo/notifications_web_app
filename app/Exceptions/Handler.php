@@ -45,4 +45,24 @@ class Handler extends ExceptionHandler
             //
         });
     }
+
+    /**
+     * Determine if the exception handler response should be JSON.
+     *
+     * API clients (the Android app) must always get JSON, even when they omit the
+     * Accept header — otherwise an expired token renders as a 302 to the HTML login
+     * page, which HTTP clients follow and report as a successful 200.
+     *
+     * The legacy /api/numbers/lookup route is excluded: it lives in routes/web.php
+     * under session auth and resources/views/messages/compose.blade.php depends on
+     * its current behaviour.
+     */
+    protected function shouldReturnJson($request, Throwable $e): bool
+    {
+        if ($request->is('api/*') && ! $request->is('api/numbers/lookup')) {
+            return true;
+        }
+
+        return parent::shouldReturnJson($request, $e);
+    }
 }
