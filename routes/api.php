@@ -1,6 +1,7 @@
 <?php
 
 use App\Http\Controllers\Api\AuthController;
+use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DelegateController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\NumberController;
@@ -34,6 +35,10 @@ Route::middleware('auth:sanctum')->group(function () {
 
     Route::get('/numbers/{number}/delegates', [DelegateController::class, 'index']);
     Route::delete('/numbers/{number}/delegates/{delegate}', [DelegateController::class, 'destroy']);
+
+    Route::get('/numbers/{number}/blocks', [BlockController::class, 'index']);
+    Route::post('/numbers/{number}/blocks', [BlockController::class, 'store']);
+    Route::delete('/numbers/{number}/blocks/{block}', [BlockController::class, 'destroy']);
 
     Route::post('/invite/{token}/accept', [InviteController::class, 'accept']);
 });
