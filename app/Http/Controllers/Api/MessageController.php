@@ -67,6 +67,12 @@ class MessageController extends Controller
 
         abort_unless($sender->user_id === $request->user()->id, 403);
 
+        abort_unless(
+            $sender->status === 'active' && $receiver->status === 'active',
+            422,
+            'Both the sending and receiving numbers must be active.'
+        );
+
         abort_unless($receiver->canReceiveFrom($sender), 422, 'This number cannot receive your message (blocked or DND).');
 
         $status = ($receiver->user->status === 'busy') ? 'queued' : 'sent';
@@ -114,10 +120,12 @@ class MessageController extends Controller
 
         $template = MessageTemplate::findOrFail($request->validated('template_id'));
 
-        abort_unless(! $message->replies()->exists(), 422, 'A reply has already been sent for this message.');
+        abort_if($message->isReply(), 422, 'You cannot reply to a reply.');
+
+        abort_if($message->hasReply(), 422, 'A reply has already been sent for this message.');
 
         abort_unless(
-            $template->category_id === $message->template->category_id && $template->is_reply && $template->is_active,
+            $message->canBeRepliedWith($template),
             422,
             'This template cannot be used as a reply to this message.'
         );

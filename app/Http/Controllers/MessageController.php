@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Message;
 use App\Models\MessageCategory;
+use App\Models\MessageTemplate;
 use App\Models\Number;
 use Illuminate\Http\Request;
 
@@ -46,6 +47,10 @@ class MessageController extends Controller
         $receiver = Number::findOrFail($data['receiver_number_id']);
 
         abort_unless($sender->user_id === auth()->id(), 403);
+
+        if ($sender->status !== 'active' || $receiver->status !== 'active') {
+            return back()->with('error', 'Both the sending and receiving numbers must be active.');
+        }
 
         if (!$receiver->canReceiveFrom($sender)) {
             return back()->with('error', 'This number cannot receive your message (blocked or DND).');
@@ -92,10 +97,27 @@ class MessageController extends Controller
             'template_id' => 'required|exists:message_templates,id',
         ]);
 
+        $template = MessageTemplate::findOrFail($data['template_id']);
+
+        // The reply rules live on the model so the web app and the API enforce the
+        // same thing; previously these were only hinted at by messages/show.blade.php
+        // and a direct POST could bypass them entirely.
+        if ($message->isReply()) {
+            return back()->with('error', 'You cannot reply to a reply.');
+        }
+
+        if ($message->hasReply()) {
+            return back()->with('error', 'A reply has already been sent for this message.');
+        }
+
+        if (! $message->canBeRepliedWith($template)) {
+            return back()->with('error', 'This template cannot be used as a reply to this message.');
+        }
+
         Message::create([
             'sender_number_id' => $message->receiver_number_id,
             'receiver_number_id' => $message->sender_number_id,
-            'template_id' => $data['template_id'],
+            'template_id' => $template->id,
             'parent_id' => $message->id,
             'status' => 'sent',
         ]);
@@ -105,16 +127,6 @@ class MessageController extends Controller
 
     public function numberInbox(Number $number)
     {
-
-
-        // abort_unless($number->isAccessibleBy(auth()->user()), 403);
-
-        // dd([
-        //     'number_id' => $number->id,
-        //     'receiver_messages' => \App\Models\Message::where('receiver_number_id', $number->id)->count(),
-        //     'sender_messages' => \App\Models\Message::where('sender_number_id', $number->id)->count(),
-        //     'all_messages' => \App\Models\Message::all(['id', 'sender_number_id', 'receiver_number_id', 'parent_id']),
-        // ]);
         // Must be owner or assistant
         abort_unless($number->isAccessibleBy(auth()->user()), 403);
 

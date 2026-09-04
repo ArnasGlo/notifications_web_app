@@ -135,6 +135,31 @@ class MessageReplyTest extends TestCase
         $this->assertDatabaseCount('messages', 2);
     }
 
+    public function test_replying_to_a_reply_is_rejected(): void
+    {
+        // Threads are one level deep (ANDROID_APP_CONTEXT.md §3). A depth-2 message
+        // would be invisible in every list view, since index/numberInbox filter on
+        // parent_id IS NULL and show() loads only direct children.
+        $senderOwner = User::factory()->create();
+        $senderNumber = Number::factory()->for($senderOwner)->create();
+        $receiverOwner = User::factory()->create();
+        $receiverNumber = Number::factory()->for($receiverOwner)->create();
+        [$message, $category] = $this->messageWithCategory($senderNumber, $receiverNumber);
+        $replyTemplate = MessageTemplate::factory()->for($category, 'category')->reply()->create();
+
+        $replyId = $this->actingAs($receiverOwner, 'sanctum')
+            ->postJson("/api/messages/{$message->id}/reply", ['template_id' => $replyTemplate->id])
+            ->assertStatus(201)
+            ->json('data.id');
+
+        // The original sender receives the reply, so they clear the 403 gate.
+        $this->actingAs($senderOwner, 'sanctum')
+            ->postJson("/api/messages/{$replyId}/reply", ['template_id' => $replyTemplate->id])
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('messages', 2);
+    }
+
     public function test_a_template_from_a_different_category_is_rejected(): void
     {
         $senderNumber = Number::factory()->create();

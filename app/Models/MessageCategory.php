@@ -10,5 +10,8 @@ class MessageCategory extends Model
     use HasFactory;
 
     protected $fillable = ['name', 'icon', 'is_active'];
+
+    protected $casts = ['is_active' => 'boolean'];
+
     public function templates() { return $this->hasMany(MessageTemplate::class, 'category_id'); }
 }

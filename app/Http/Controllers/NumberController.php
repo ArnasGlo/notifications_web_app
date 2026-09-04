@@ -32,7 +32,7 @@ class NumberController extends Controller
 
     public function edit(Number $number)
     {
-        $this->authorize('update', $number); // add policy or check manually
+        abort_unless($number->user_id === auth()->id(), 403);
         return view('numbers.edit', compact('number'));
     }
 
@@ -50,6 +50,13 @@ class NumberController extends Controller
     public function destroy(Number $number)
     {
         abort_unless($number->user_id === auth()->id(), 403);
+
+        // messages.sender_number_id / receiver_number_id are RESTRICT foreign keys,
+        // so deleting a number with history would raise a constraint violation.
+        if ($number->sentMessages()->exists() || $number->receivedMessages()->exists()) {
+            return back()->with('error', 'This number has message history and cannot be deleted. Set it to inactive instead.');
+        }
+
         $number->delete();
         return redirect()->route('numbers.index')->with('success', 'Number deleted.');
     }

@@ -90,7 +90,10 @@
             @endif
 
             @php
-                $canReply       = $accessibleIds->contains($message->receiver_number_id);
+                // Threads are one level deep: a reply cannot itself be replied to.
+                // MessageController@reply enforces this server-side.
+                $isReply        = ! is_null($message->parent_id);
+                $canReply       = ! $isReply && $accessibleIds->contains($message->receiver_number_id);
                 $alreadyReplied = $message->replies->whereIn('sender_number_id', $accessibleIds->toArray())->isNotEmpty();
             @endphp
 
@@ -129,7 +132,7 @@
                     <i class="fas fa-check-circle me-2"></i>A reply has already been sent for this message.
                 </div>
 
-            @elseif(!$canReply)
+            @elseif(!$isReply && !$canReply)
                 <div class="alert alert-light border">
                     <i class="fas fa-info-circle me-2 text-muted"></i>
                     You sent this message. Replies from the recipient will appear above.

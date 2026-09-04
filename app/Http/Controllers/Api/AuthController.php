@@ -16,6 +16,8 @@ class AuthController extends Controller
         $credentials = $request->validate([
             'email' => ['required', 'string'],
             'password' => ['required', 'string'],
+            // Names the issued token so multiple devices stay distinguishable.
+            'device_name' => ['nullable', 'string', 'max:255'],
         ]);
 
         // Deliberately not Auth::attempt(): that drives the session-based 'web' guard,
@@ -29,7 +31,10 @@ class AuthController extends Controller
         }
 
         return response()->json([
-            'token' => $user->createToken('android')->plainTextToken,
+            'data' => [
+                'token' => $user->createToken($credentials['device_name'] ?? 'android')->plainTextToken,
+                'user' => new UserResource($user),
+            ],
         ]);
     }
 

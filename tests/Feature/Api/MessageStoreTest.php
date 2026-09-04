@@ -112,6 +112,44 @@ class MessageStoreTest extends TestCase
         $this->assertDatabaseCount('messages', 0);
     }
 
+    public function test_store_rejects_an_inactive_sender_number(): void
+    {
+        // ANDROID_APP_CONTEXT.md §2: inactive numbers can't send or receive. The web
+        // app only enforced this by omitting them from the compose picker.
+        $owner = User::factory()->create();
+        $sender = Number::factory()->for($owner)->inactive()->create();
+        $receiver = Number::factory()->create();
+        $template = $this->template();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+            ])
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('messages', 0);
+    }
+
+    public function test_store_rejects_an_inactive_receiver_number(): void
+    {
+        $owner = User::factory()->create();
+        $sender = Number::factory()->for($owner)->create();
+        $receiver = Number::factory()->inactive()->create();
+        $template = $this->template();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+            ])
+            ->assertStatus(422);
+
+        $this->assertDatabaseCount('messages', 0);
+    }
+
     public function test_store_requires_sender_receiver_and_template(): void
     {
         $owner = User::factory()->create();

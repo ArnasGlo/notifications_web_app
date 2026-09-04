@@ -187,6 +187,33 @@ class MessageShowTest extends TestCase
         $this->assertFalse($ids->contains($nonReply->id));
     }
 
+    public function test_read_at_is_serialised_identically_when_freshly_marked_and_when_re_read(): void
+    {
+        // Without a datetime cast on Message::$read_at the show response returned an
+        // in-memory Carbon (ISO-8601) while every later read returned the raw DB
+        // string "Y-m-d H:i:s" — two formats for one field.
+        $owner = User::factory()->create();
+        $number = Number::factory()->for($owner)->create();
+        $other = Number::factory()->create();
+        $message = Message::factory()->create([
+            'sender_number_id' => $other->id,
+            'receiver_number_id' => $number->id,
+            'status' => 'sent',
+        ]);
+
+        $onShow = $this->actingAs($owner, 'sanctum')
+            ->getJson("/api/messages/{$message->id}")
+            ->json('data.read_at');
+
+        $onIndex = $this->actingAs($owner, 'sanctum')
+            ->getJson('/api/messages')
+            ->json('data.0.read_at');
+
+        $this->assertNotNull($onShow);
+        $this->assertSame($onShow, $onIndex);
+        $this->assertMatchesRegularExpression('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{6}Z$/', $onShow);
+    }
+
     public function test_requires_authentication(): void
     {
         $message = Message::factory()->create();

@@ -3,6 +3,7 @@
 namespace Tests\Feature\Api;
 
 use App\Models\Delegate;
+use App\Models\Message;
 use App\Models\Number;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -176,6 +177,43 @@ class NumberCrudTest extends TestCase
             ->assertStatus(204);
 
         $this->assertDatabaseMissing('numbers', ['id' => $number->id]);
+    }
+
+    public function test_destroy_is_refused_when_the_number_has_sent_a_message(): void
+    {
+        // messages.sender_number_id is a RESTRICT foreign key — an unguarded delete
+        // raises a constraint violation rather than a usable API error.
+        $user = User::factory()->create();
+        $number = Number::factory()->for($user)->create();
+        $other = Number::factory()->create();
+        Message::factory()->create([
+            'sender_number_id' => $number->id,
+            'receiver_number_id' => $other->id,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/numbers/{$number->id}")
+            ->assertStatus(409)
+            ->assertJsonStructure(['message']);
+
+        $this->assertDatabaseHas('numbers', ['id' => $number->id]);
+    }
+
+    public function test_destroy_is_refused_when_the_number_has_received_a_message(): void
+    {
+        $user = User::factory()->create();
+        $number = Number::factory()->for($user)->create();
+        $other = Number::factory()->create();
+        Message::factory()->create([
+            'sender_number_id' => $other->id,
+            'receiver_number_id' => $number->id,
+        ]);
+
+        $this->actingAs($user, 'sanctum')
+            ->deleteJson("/api/numbers/{$number->id}")
+            ->assertStatus(409);
+
+        $this->assertDatabaseHas('numbers', ['id' => $number->id]);
     }
 
     public function test_destroy_is_forbidden_for_a_number_owned_by_another_user(): void
