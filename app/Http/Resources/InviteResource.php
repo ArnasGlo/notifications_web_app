@@ -25,8 +25,8 @@ class InviteResource extends JsonResource
                 'id' => $this->user->id,
                 'name' => $this->user->name,
             ],
-            'is_owner' => $this->user_id === $user->id,
-            'already_assistant' => $this->hasAssistant($user),
+            'is_owner' => $user ? $this->user_id === $user->id : false,
+            'already_assistant' => $user ? $this->hasAssistant($user) : false,
         ];
     }
 }

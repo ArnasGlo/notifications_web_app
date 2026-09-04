@@ -19,6 +19,8 @@ use Illuminate\Support\Facades\Route;
 */
 Route::post('/login', [AuthController::class, 'login']);
 
+Route::get('/invite/{token}', [InviteController::class, 'show']);
+
 Route::middleware('auth:sanctum')->group(function () {
     Route::post('/logout', [AuthController::class, 'logout']);
 
@@ -36,6 +38,5 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/numbers/{number}/delegates', [DelegateController::class, 'index']);
     Route::delete('/numbers/{number}/delegates/{delegate}', [DelegateController::class, 'destroy']);
 
-    Route::get('/invite/{token}', [InviteController::class, 'show']);
     Route::post('/invite/{token}/accept', [InviteController::class, 'accept']);
 });

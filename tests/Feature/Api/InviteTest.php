@@ -63,11 +63,17 @@ class InviteTest extends TestCase
             ->assertStatus(404);
     }
 
-    public function test_show_requires_authentication(): void
+    public function test_show_resolves_without_authentication(): void
     {
-        $number = Number::factory()->create();
+        $owner = User::factory()->create(['name' => 'Owner Name']);
+        $number = Number::factory()->for($owner)->create();
 
-        $this->getJson("/api/invite/{$number->share_token}")->assertStatus(401);
+        $this->getJson("/api/invite/{$number->share_token}")
+            ->assertStatus(200)
+            ->assertJsonPath('data.number.id', $number->id)
+            ->assertJsonPath('data.owner.name', 'Owner Name')
+            ->assertJsonPath('data.is_owner', false)
+            ->assertJsonPath('data.already_assistant', false);
     }
 
     public function test_accept_creates_a_delegate_for_a_new_user(): void
