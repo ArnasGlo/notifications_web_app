@@ -46,7 +46,6 @@
                 @csrf
                 <input type="hidden" name="sender_number_id"   id="senderNumberId"   value="{{ old('sender_number_id') }}">
                 <input type="hidden" name="receiver_number_id" id="receiverNumberId" value="{{ old('receiver_number_id') }}">
-                <input type="hidden" name="template_id"        id="templateId"        value="{{ old('template_id') }}">
 
                 {{-- ── Step 1: Send From ─────────────────────────────────── --}}
                 <div class="card border-0 shadow-sm mb-3" id="step1">
@@ -100,52 +99,21 @@
                     </div>
                 </div>
 
-                {{-- ── Step 3: Category + Template ──────────────────────── --}}
+                {{-- ── Step 3: Message body (free text or /template) ─────── --}}
                 <div class="card border-0 shadow-sm mb-4 {{ !old('receiver_number_id') ? 'opacity-50' : '' }}"
                      id="step3" style="{{ !old('receiver_number_id') ? 'pointer-events:none' : '' }}">
                     <div class="card-body p-4">
                         <h5 class="fw-bold mb-3">
-                            <span class="badge bg-primary me-2">3</span> Choose message
+                            <span class="badge bg-primary me-2">3</span> Write message
                         </h5>
 
-                        {{-- Category pills --}}
-                        <div class="mb-3 d-flex flex-wrap gap-2" id="categoryList">
-                            @foreach($categories as $cat)
-                            <button type="button"
-                                    class="btn btn-outline-secondary category-btn"
-                                    data-id="{{ $cat->id }}"
-                                    onclick="selectCategory({{ $cat->id }}, this)">
-                                <i class="{{ $cat->icon ?? 'fas fa-tag' }} me-1"></i>
-                                {{ $cat->name }}
-                            </button>
-                            @endforeach
-                        </div>
-
-                        {{-- Template list (populated by JS) --}}
-                        <div id="templateSection" class="{{ !old('template_id') ? 'd-none' : '' }}">
-                            <hr class="my-3">
-                            <p class="text-muted small mb-2 fw-semibold">SELECT A MESSAGE</p>
-                            <div class="list-group" id="templateList">
-                                {{-- Pre-select on validation error --}}
-                                @if(old('template_id'))
-                                    @php
-                                        $oldTpl = $categories->flatMap->templates->firstWhere('id', old('template_id'));
-                                    @endphp
-                                    @if($oldTpl)
-                                    <button type="button" class="list-group-item list-group-item-action active template-btn"
-                                        data-id="{{ $oldTpl->id }}">
-                                        {{ $oldTpl->body }}
-                                    </button>
-                                    @endif
-                                @endif
-                            </div>
-                        </div>
+                        @include('partials.message-composer')
                     </div>
                 </div>
 
                 <div class="d-grid">
                     <button type="submit" class="btn btn-success btn-lg" id="sendBtn"
-                            {{ !old('template_id') ? 'disabled' : '' }}>
+                            {{ trim(old('body', '')) === '' ? 'disabled' : '' }}>
                         <i class="fas fa-paper-plane me-2"></i> Send Message
                     </button>
                 </div>
@@ -195,7 +163,6 @@
 
 @push('scripts')
 <script>
-const categories = @json($categories->keyBy('id'));
 
 // ── Step 1 ──────────────────────────────────────────────
 function selectSender(id, el) {
@@ -250,38 +217,13 @@ document.getElementById('receiverInput').addEventListener('keydown', function(e)
 });
 
 // ── Step 3 ──────────────────────────────────────────────
-function selectCategory(id, btn) {
-    document.querySelectorAll('.category-btn').forEach(b => {
-        b.classList.remove('btn-primary');
-        b.classList.add('btn-outline-secondary');
-    });
-    btn.classList.remove('btn-outline-secondary');
-    btn.classList.add('btn-primary');
-
-    const cat = categories[id];
-    const templates = cat.templates.filter(t => !t.is_reply && t.is_active);
-
-    const list = document.getElementById('templateList');
-    list.innerHTML = templates.map(t =>
-        `<button type="button" class="list-group-item list-group-item-action template-btn" data-id="${t.id}">
-            ${t.body}
-        </button>`
-    ).join('');
-
-    list.querySelectorAll('.template-btn').forEach(tb => {
-        tb.addEventListener('click', function() {
-            list.querySelectorAll('.template-btn').forEach(x => x.classList.remove('active'));
-            this.classList.add('active');
-            document.getElementById('templateId').value = this.dataset.id;
-            document.getElementById('sendBtn').disabled = false;
-            setStepDone(3);
-        });
-    });
-
-    document.getElementById('templateSection').classList.remove('d-none');
-    document.getElementById('templateId').value = '';
-    document.getElementById('sendBtn').disabled = true;
-}
+// The composer partial fires composer:changed on every edit, including when
+// a /template is inserted, so the button just tracks whether there's text.
+document.addEventListener('composer:changed', function (e) {
+    const hasText = e.target.value.trim().length > 0;
+    document.getElementById('sendBtn').disabled = !hasText;
+    if (hasText) setStepDone(3);
+});
 
 // ── Step indicators ──────────────────────────────────────
 function setStepActive(n) {

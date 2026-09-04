@@ -7,6 +7,7 @@ use App\Http\Controllers\Admin\MessageCategoryController;
 use App\Http\Controllers\NumberController;
 use App\Http\Controllers\BlockController;
 use App\Http\Controllers\MessageController;
+use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\DelegateController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\InviteController;
@@ -37,13 +38,12 @@ Route::middleware('auth')->group(function () {
     Route::delete('numbers/{number}/delegates/{delegate}', [DelegateController::class, 'destroy'])->name('numbers.delegates.destroy');
 
     // Messaging
-    Route::get('messages', [MessageController::class, 'index'])->name('messages.index');
+    Route::get('messages', [ConversationController::class, 'index'])->name('messages.index');
+    Route::get('conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
     Route::get('messages/compose', [MessageController::class, 'compose'])->name('messages.compose');
     Route::post('messages', [MessageController::class, 'store'])->name('messages.store');
-    Route::get('messages/{message}', [MessageController::class, 'show'])->name('messages.show');
-    Route::post('messages/{message}/reply', [MessageController::class, 'reply'])->name('messages.reply');
-    
-    Route::get('numbers/{number}/messages', [MessageController::class, 'numberInbox'])->name('numbers.messages');
+
+    Route::get('numbers/{number}/messages', [ConversationController::class, 'forNumber'])->name('numbers.messages');
 
     Route::post('status', [App\Http\Controllers\StatusController::class, 'update'])->name('status.update');
 

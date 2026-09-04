@@ -39,7 +39,7 @@
                     <ul class="navbar-nav me-auto">
                         @auth
                         <li class="nav-item">
-                            <a class="nav-link {{ request()->routeIs('messages.*') ? 'active fw-semibold' : '' }}"
+                            <a class="nav-link {{ request()->routeIs('messages.index') || request()->routeIs('conversations.*') ? 'active fw-semibold' : '' }}"
                                href="{{ route('messages.index') }}">
                                 <i class="fas fa-inbox me-1"></i> Inbox
                             </a>

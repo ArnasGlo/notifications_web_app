@@ -22,6 +22,10 @@ class MessageFactory extends Factory
             'sender_number_id' => Number::factory(),
             'receiver_number_id' => Number::factory(),
             'template_id' => MessageTemplate::factory(),
+            // Mirrors a message seeded from its template, which is what every
+            // message was before free text existed. Override for typed messages.
+            'body' => fn (array $attributes) => MessageTemplate::find($attributes['template_id'])?->body
+                ?? fake()->sentence(4),
             'parent_id' => null,
             'status' => 'sent',
         ];

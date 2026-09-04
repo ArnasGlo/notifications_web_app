@@ -11,9 +11,39 @@ class Message extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['sender_number_id', 'receiver_number_id', 'template_id', 'parent_id', 'status', 'read_at'];
+    protected $fillable = ['conversation_id', 'sender_number_id', 'receiver_number_id', 'template_id', 'body', 'parent_id', 'status', 'read_at'];
 
     protected $casts = ['read_at' => 'datetime'];
+
+    /**
+     * Every message belongs to the conversation for its number pair, and every
+     * message advances that conversation's activity clock.
+     *
+     * Hooked on the model rather than done by callers so no write path can forget:
+     * the send/reply actions, factories and seeders all inherit it.
+     */
+    protected static function booted(): void
+    {
+        static::creating(function (Message $message) {
+            $message->conversation_id ??= Conversation::between(
+                $message->sender_number_id,
+                $message->receiver_number_id,
+            )->id;
+        });
+
+        static::created(function (Message $message) {
+            $conversation = $message->conversation;
+
+            // Guarded so a backdated insert (factories, seeders, backfills) can't
+            // drag the ordering clock backwards.
+            if (is_null($conversation->last_message_at)
+                || $message->created_at->gt($conversation->last_message_at)) {
+                $conversation->update(['last_message_at' => $message->created_at]);
+            }
+        });
+    }
+
+    public function conversation() { return $this->belongsTo(Conversation::class); }
 
     public function sender() { return $this->belongsTo(Number::class, 'sender_number_id'); }
     public function receiver() { return $this->belongsTo(Number::class, 'receiver_number_id'); }
@@ -79,11 +109,30 @@ class Message extends Model
         return $this->replies()->exists();
     }
 
-    /** True if the given template is a valid reply to this message. */
+    /**
+     * True if the given template is a valid reply to this message.
+     *
+     * A message typed freely has no template and therefore no category, so the
+     * same-category rule cannot be evaluated and no templated reply qualifies.
+     */
     public function canBeRepliedWith(MessageTemplate $template): bool
     {
-        return (bool) $template->is_reply
+        return ! is_null($this->template)
+            && (bool) $template->is_reply
             && (bool) $template->is_active
             && $template->category_id === $this->template->category_id;
+    }
+
+    /** Active reply templates in this message's category; empty when it has no template. */
+    public function availableReplyTemplates()
+    {
+        if (is_null($this->template)) {
+            return new Collection;
+        }
+
+        return $this->template->category->templates()
+            ->where('is_reply', true)
+            ->where('is_active', true)
+            ->get();
     }
 }

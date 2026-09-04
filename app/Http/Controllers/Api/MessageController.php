@@ -2,6 +2,9 @@
 
 namespace App\Http\Controllers\Api;
 
+use App\Actions\ReplyToMessage;
+use App\Actions\SendMessage;
+use App\Exceptions\CannotSendMessage;
 use App\Http\Controllers\Controller;
 use App\Http\Requests\Api\MessageReplyRequest;
 use App\Http\Requests\Api\MessageStoreRequest;
@@ -49,35 +52,18 @@ class MessageController extends Controller
 
     public function composeData(Request $request)
     {
-        $categories = MessageCategory::with(['templates' => function ($q) {
-            $q->where('is_active', true)->where('is_reply', false);
-        }])
-            ->where('is_active', true)
-            ->get();
+        $categories = MessageCategory::composePayload();
 
         return ComposeCategoryResource::collection($categories);
     }
 
-    public function store(MessageStoreRequest $request)
+    public function store(MessageStoreRequest $request, SendMessage $send)
     {
-        $data = $request->validated();
-
-        $sender = Number::findOrFail($data['sender_number_id']);
-        $receiver = Number::findOrFail($data['receiver_number_id']);
-
-        abort_unless($sender->user_id === $request->user()->id, 403);
-
-        abort_unless(
-            $sender->status === 'active' && $receiver->status === 'active',
-            422,
-            'Both the sending and receiving numbers must be active.'
-        );
-
-        abort_unless($receiver->canReceiveFrom($sender), 422, 'This number cannot receive your message (blocked or DND).');
-
-        $status = ($receiver->user->status === 'busy') ? 'queued' : 'sent';
-
-        $message = Message::create(array_merge($data, ['status' => $status]));
+        try {
+            $message = $send($request->user(), $request->validated());
+        } catch (CannotSendMessage $e) {
+            abort($e->status, $e->getMessage());
+        }
 
         return (new MessageResource($message->load(['sender', 'receiver', 'template.category'])))
             ->response()
@@ -103,40 +89,21 @@ class MessageController extends Controller
             $message->update(['status' => 'read', 'read_at' => now()]);
         }
 
-        $replyTemplates = $message->template->category->templates()
-            ->where('is_reply', true)
-            ->where('is_active', true)
-            ->get();
+        $replyTemplates = $message->availableReplyTemplates();
         $message->setRelation('replyTemplates', $replyTemplates);
 
         return new MessageResource($message);
     }
 
-    public function reply(MessageReplyRequest $request, Message $message)
+    public function reply(MessageReplyRequest $request, Message $message, ReplyToMessage $replyTo)
     {
-        $accessibleIds = $request->user()->accessibleNumberIds();
-
-        abort_unless($accessibleIds->contains($message->receiver_number_id), 403);
-
         $template = MessageTemplate::findOrFail($request->validated('template_id'));
 
-        abort_if($message->isReply(), 422, 'You cannot reply to a reply.');
-
-        abort_if($message->hasReply(), 422, 'A reply has already been sent for this message.');
-
-        abort_unless(
-            $message->canBeRepliedWith($template),
-            422,
-            'This template cannot be used as a reply to this message.'
-        );
-
-        $reply = Message::create([
-            'sender_number_id' => $message->receiver_number_id,
-            'receiver_number_id' => $message->sender_number_id,
-            'template_id' => $template->id,
-            'parent_id' => $message->id,
-            'status' => 'sent',
-        ]);
+        try {
+            $reply = $replyTo($request->user(), $message, $template);
+        } catch (CannotSendMessage $e) {
+            abort($e->status, $e->getMessage());
+        }
 
         return (new MessageResource($reply->load(['sender', 'receiver', 'template.category'])))
             ->response()

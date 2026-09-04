@@ -16,7 +16,10 @@ class MessageStoreRequest extends FormRequest
         return [
             'sender_number_id' => ['required', 'exists:numbers,id'],
             'receiver_number_id' => ['required', 'exists:numbers,id', 'different:sender_number_id'],
-            'template_id' => ['required', 'exists:message_templates,id'],
+            // Send free text, or name a template and let its body stand as-is.
+            // At least one of the two must be present.
+            'body' => ['required_without:template_id', 'nullable', 'string', 'max:255'],
+            'template_id' => ['nullable', 'exists:message_templates,id'],
         ];
     }
 }

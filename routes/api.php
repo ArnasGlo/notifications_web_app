@@ -2,6 +2,7 @@
 
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
+use App\Http\Controllers\Api\ConversationController;
 use App\Http\Controllers\Api\DelegateController;
 use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\InviteController;
@@ -44,6 +45,9 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::delete('/numbers/{number}/blocks/{block}', [BlockController::class, 'destroy']);
 
     Route::get('/numbers/{number}/messages', [MessageController::class, 'numberInbox']);
+
+    Route::get('/conversations', [ConversationController::class, 'index']);
+    Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
 
     Route::get('/messages/compose-data', [MessageController::class, 'composeData']);
     Route::get('/messages', [MessageController::class, 'index']);

@@ -94,7 +94,7 @@
                                     {{ $msg->sender->number }}
                                 @endif
                             </td>
-                            <td class="small">{{ $msg->template->body }}</td>
+                            <td class="small">{{ $msg->body }}</td>
                             <td>
                                 <span class="badge
                                     {{ $msg->status === 'sent'    ? 'badge-primary'   : '' }}

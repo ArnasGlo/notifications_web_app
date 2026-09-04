@@ -2,6 +2,7 @@
 
 namespace Tests\Feature;
 
+use App\Models\Message;
 use App\Models\MessageCategory;
 use App\Models\MessageTemplate;
 use App\Models\Number;
@@ -37,16 +38,17 @@ class MessageStoreWebTest extends TestCase
             ]);
     }
 
-    public function test_an_active_pair_still_sends(): void
+    public function test_an_active_pair_still_sends_and_lands_in_the_thread(): void
     {
         $owner = User::factory()->create();
         $sender = Number::factory()->for($owner)->create();
         $receiver = Number::factory()->create();
 
-        $this->send($owner, $sender, $receiver)
-            ->assertRedirect(route('messages.index'));
+        $response = $this->send($owner, $sender, $receiver);
 
         $this->assertDatabaseCount('messages', 1);
+        $message = Message::firstOrFail();
+        $response->assertRedirect(route('conversations.show', $message->conversation_id));
     }
 
     public function test_an_inactive_sender_is_rejected(): void

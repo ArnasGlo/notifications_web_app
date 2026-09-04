@@ -166,9 +166,9 @@ class FavoriteWebTest extends TestCase
         ]);
 
         $this->actingAs($owner)
-            ->get(route('messages.show', $message))
+            ->get(route('conversations.show', $message->conversation_id))
             ->assertStatus(200)
-            ->assertSee('Favorite');
+            ->assertSee('Add to favorites');
     }
 
     public function test_starring_from_a_thread_returns_to_the_thread(): void
@@ -181,10 +181,12 @@ class FavoriteWebTest extends TestCase
             'receiver_number_id' => $mine->id,
         ]);
 
+        $thread = route('conversations.show', $message->conversation_id);
+
         $this->actingAs($owner)
-            ->from(route('messages.show', $message))
+            ->from($thread)
             ->post(route('favorites.store'), ['number' => $alice->number])
-            ->assertRedirect(route('messages.show', $message));
+            ->assertRedirect($thread);
 
         $this->assertDatabaseHas('favorites', [
             'user_id' => $owner->id,

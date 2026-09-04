@@ -150,14 +150,99 @@ class MessageStoreTest extends TestCase
         $this->assertDatabaseCount('messages', 0);
     }
 
-    public function test_store_requires_sender_receiver_and_template(): void
+    public function test_store_requires_sender_receiver_and_some_content(): void
     {
         $owner = User::factory()->create();
 
         $this->actingAs($owner, 'sanctum')
             ->postJson('/api/messages', [])
             ->assertStatus(422)
-            ->assertJsonValidationErrors(['sender_number_id', 'receiver_number_id', 'template_id']);
+            ->assertJsonValidationErrors(['sender_number_id', 'receiver_number_id', 'body']);
+    }
+
+    // ── free text vs template ────────────────────────────────────────────
+
+    /** @return array{0: User, 1: Number, 2: Number} */
+    private function activePair(): array
+    {
+        $owner = User::factory()->create();
+
+        return [$owner, Number::factory()->for($owner)->create(), Number::factory()->create()];
+    }
+
+    public function test_store_accepts_free_text_with_no_template(): void
+    {
+        [$owner, $sender, $receiver] = $this->activePair();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'body' => 'Typed by hand',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.body', 'Typed by hand')
+            ->assertJsonPath('data.template', null);
+
+        $this->assertDatabaseHas('messages', ['body' => 'Typed by hand', 'template_id' => null]);
+    }
+
+    public function test_store_falls_back_to_the_template_body_when_no_text_is_given(): void
+    {
+        [$owner, $sender, $receiver] = $this->activePair();
+        $template = MessageTemplate::factory()
+            ->for(MessageCategory::factory()->create(), 'category')
+            ->create(['body' => 'Can you talk?']);
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.body', 'Can you talk?')
+            ->assertJsonPath('data.template.id', $template->id);
+    }
+
+    public function test_typed_text_overrides_the_template_body(): void
+    {
+        // The composer inserts a canned response as editable text, so what was
+        // sent can differ from the template it came from.
+        [$owner, $sender, $receiver] = $this->activePair();
+        $template = MessageTemplate::factory()
+            ->for(MessageCategory::factory()->create(), 'category')
+            ->create(['body' => 'Can you talk?']);
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+                'body' => 'Can you talk in 10 minutes?',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.body', 'Can you talk in 10 minutes?')
+            ->assertJsonPath('data.template.id', $template->id);
+
+        $this->assertDatabaseHas('messages', [
+            'body' => 'Can you talk in 10 minutes?',
+            'template_id' => $template->id,
+        ]);
+    }
+
+    public function test_store_rejects_a_body_over_255_characters(): void
+    {
+        [$owner, $sender, $receiver] = $this->activePair();
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'body' => str_repeat('a', 256),
+            ])
+            ->assertStatus(422)
+            ->assertJsonValidationErrors(['body']);
     }
 
     public function test_store_rejects_a_nonexistent_sender(): void

@@ -28,7 +28,10 @@ class MessageResource extends JsonResource
                 'number' => $this->receiver->number,
                 'user_id' => $this->receiver->user_id,
             ],
-            'template' => [
+            'body' => $this->body,
+            // Provenance only — null when the message was typed rather than
+            // seeded from a canned response. `body` is what was actually sent.
+            'template' => $this->template ? [
                 'id' => $this->template->id,
                 'body' => $this->template->body,
                 'category' => [
@@ -36,7 +39,7 @@ class MessageResource extends JsonResource
                     'name' => $this->template->category->name,
                     'icon' => $this->template->category->icon,
                 ],
-            ],
+            ] : null,
             'replies' => $this->whenLoaded('replies', fn () => $this->replies->map(fn ($r) => [
                 'id' => $r->id,
                 'status' => $r->status,
@@ -51,10 +54,11 @@ class MessageResource extends JsonResource
                     'number' => $r->receiver->number,
                     'user_id' => $r->receiver->user_id,
                 ],
-                'template' => [
+                'body' => $r->body,
+                'template' => $r->template ? [
                     'id' => $r->template->id,
                     'body' => $r->template->body,
-                ],
+                ] : null,
             ])->values()),
             'reply_templates' => $this->whenLoaded('replyTemplates', fn () => $this->replyTemplates->map(fn ($t) => [
                 'id' => $t->id,
