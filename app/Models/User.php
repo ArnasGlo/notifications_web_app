@@ -26,6 +26,12 @@ class User extends Authenticatable
         return $this->hasMany(Delegate::class, 'assistant_user_id');
     }
 
+    /** Numbers this user has starred for quick access. */
+    public function favorites(): HasMany
+    {
+        return $this->hasMany(Favorite::class);
+    }
+
     /** All number IDs this user can manage: owned + delegated. */
     public function accessibleNumberIds()
     {

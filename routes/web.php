@@ -8,6 +8,7 @@ use App\Http\Controllers\NumberController;
 use App\Http\Controllers\BlockController;
 use App\Http\Controllers\MessageController;
 use App\Http\Controllers\DelegateController;
+use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\InviteController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
@@ -29,6 +30,7 @@ Route::middleware('auth')->group(function () {
 
     Route::resource('numbers', NumberController::class)->except(['show']);
     Route::resource('numbers.blocks', BlockController::class)->only(['index', 'create', 'store', 'destroy']);
+    Route::resource('favorites', FavoriteController::class)->only(['index', 'store', 'destroy']);
 
     // Delegation management
     Route::get('numbers/{number}/delegates', [DelegateController::class, 'index'])->name('numbers.delegates.index');

@@ -10,18 +10,18 @@ use Illuminate\Http\Request;
 
 class MessageController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $accessibleIds = auth()->user()->accessibleNumberIds();
+        $search = trim((string) $request->input('q'));
 
-        $messages = Message::where(function ($q) use ($accessibleIds) {
-            $q->whereIn('receiver_number_id', $accessibleIds)
-                ->orWhereIn('sender_number_id', $accessibleIds);
-        })
+        $messages = Message::accessibleTo($accessibleIds)
+            ->when($search !== '', fn ($q) => $q->withCounterpart($search, $accessibleIds))
             ->whereNull('parent_id')
             ->with(['sender', 'receiver', 'template.category'])
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->appends($request->only('q'));
 
         $myNumberIds = auth()->user()->numbers()->pluck('id');
 
@@ -85,7 +85,21 @@ class MessageController extends Controller
             ->where('is_active', true)
             ->get();
 
-        return view('messages.show', compact('message', 'replyTemplates', 'myNumberIds', 'accessibleIds'));
+        // The other party in this thread — the side the viewer has no access to.
+        // Null when they can see both ends (they own or assist both numbers).
+        $counterpart = match (true) {
+            ! $accessibleIds->contains($message->sender_number_id) => $message->sender,
+            ! $accessibleIds->contains($message->receiver_number_id) => $message->receiver,
+            default => null,
+        };
+
+        $counterpartFavorite = $counterpart
+            ? auth()->user()->favorites()->where('number_id', $counterpart->id)->first()
+            : null;
+
+        return view('messages.show', compact(
+            'message', 'replyTemplates', 'myNumberIds', 'accessibleIds', 'counterpart', 'counterpartFavorite'
+        ));
     }
 
     public function reply(Request $request, Message $message)

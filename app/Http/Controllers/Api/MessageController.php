@@ -18,15 +18,15 @@ class MessageController extends Controller
     public function index(Request $request)
     {
         $accessibleIds = $request->user()->accessibleNumberIds();
+        $search = trim((string) $request->input('q'));
 
-        $messages = Message::where(function ($q) use ($accessibleIds) {
-            $q->whereIn('receiver_number_id', $accessibleIds)
-                ->orWhereIn('sender_number_id', $accessibleIds);
-        })
+        $messages = Message::accessibleTo($accessibleIds)
+            ->when($search !== '', fn ($q) => $q->withCounterpart($search, $accessibleIds))
             ->whereNull('parent_id')
             ->with(['sender', 'receiver', 'template.category'])
             ->latest()
-            ->paginate(20);
+            ->paginate(20)
+            ->appends($request->only('q'));
 
         return MessageResource::collection($messages);
     }

@@ -16,6 +16,28 @@
                         &middot; {{ $message->created_at->format('d M Y, H:i') }}
                     </small>
                 </div>
+
+                @if($counterpart)
+                    <div class="ms-auto">
+                        @if($counterpartFavorite)
+                            <form action="{{ route('favorites.destroy', $counterpartFavorite) }}" method="POST">
+                                @csrf
+                                @method('DELETE')
+                                <button class="btn btn-sm btn-warning" title="Remove from favorites">
+                                    <i class="fas fa-star me-1"></i> Favorited
+                                </button>
+                            </form>
+                        @else
+                            <form action="{{ route('favorites.store') }}" method="POST">
+                                @csrf
+                                <input type="hidden" name="number" value="{{ $counterpart->number }}">
+                                <button class="btn btn-sm btn-outline-warning" title="Add to favorites">
+                                    <i class="far fa-star me-1"></i> Favorite
+                                </button>
+                            </form>
+                        @endif
+                    </div>
+                @endif
             </div>
 
             @if(session('success'))

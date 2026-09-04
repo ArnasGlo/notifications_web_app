@@ -19,20 +19,50 @@
     <div class="d-flex justify-content-between align-items-center mb-4">
         <div>
             <h2 class="mb-0 fw-bold">Messages</h2>
-            <small class="text-muted">All sent and received messages</small>
+            <small class="text-muted">
+                @if(request('q'))
+                    Conversation with <strong>{{ request('q') }}</strong>
+                @else
+                    All sent and received messages
+                @endif
+            </small>
         </div>
         <a href="{{ route('messages.compose') }}" class="btn btn-primary">
             <i class="fas fa-paper-plane me-1"></i> Compose
         </a>
     </div>
 
+    <form method="GET" action="{{ route('messages.index') }}" class="mb-4">
+        <div class="input-group">
+            <span class="input-group-text bg-white"><i class="fas fa-search text-muted"></i></span>
+            <input type="text"
+                   name="q"
+                   value="{{ request('q') }}"
+                   class="form-control"
+                   placeholder="Filter by number, e.g. +37060011111">
+            <button class="btn btn-outline-secondary" type="submit">Search</button>
+            @if(request('q'))
+                <a href="{{ route('messages.index') }}" class="btn btn-outline-secondary" title="Clear filter">
+                    <i class="fas fa-times"></i>
+                </a>
+            @endif
+        </div>
+    </form>
+
     @if($messages->isEmpty())
         <div class="card border-0 shadow-sm">
             <div class="card-body text-center py-5">
-                <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
-                <h5 class="text-muted">No messages yet</h5>
-                <p class="text-muted mb-4">Send your first message or share your invite link to get started.</p>
-                <a href="{{ route('messages.compose') }}" class="btn btn-primary">Send First Message</a>
+                @if(request('q'))
+                    <i class="fas fa-search fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No messages with that number</h5>
+                    <p class="text-muted mb-4">Nothing matches <strong>{{ request('q') }}</strong> in your inbox.</p>
+                    <a href="{{ route('messages.index') }}" class="btn btn-outline-secondary">Clear filter</a>
+                @else
+                    <i class="fas fa-inbox fa-3x text-muted mb-3"></i>
+                    <h5 class="text-muted">No messages yet</h5>
+                    <p class="text-muted mb-4">Send your first message or share your invite link to get started.</p>
+                    <a href="{{ route('messages.compose') }}" class="btn btn-primary">Send First Message</a>
+                @endif
             </div>
         </div>
     @else

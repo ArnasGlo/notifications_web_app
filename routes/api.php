@@ -3,6 +3,7 @@
 use App\Http\Controllers\Api\AuthController;
 use App\Http\Controllers\Api\BlockController;
 use App\Http\Controllers\Api\DelegateController;
+use App\Http\Controllers\Api\FavoriteController;
 use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NumberController;
@@ -49,6 +50,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::post('/messages', [MessageController::class, 'store']);
     Route::get('/messages/{message}', [MessageController::class, 'show']);
     Route::post('/messages/{message}/reply', [MessageController::class, 'reply']);
+
+    Route::get('/favorites', [FavoriteController::class, 'index']);
+    Route::post('/favorites', [FavoriteController::class, 'store']);
+    Route::delete('/favorites/{favorite}', [FavoriteController::class, 'destroy']);
 
     Route::patch('/status', [StatusController::class, 'update']);
 

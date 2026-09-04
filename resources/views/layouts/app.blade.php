@@ -51,6 +51,12 @@
                             </a>
                         </li>
                         <li class="nav-item">
+                            <a class="nav-link {{ request()->routeIs('favorites.*') ? 'active fw-semibold' : '' }}"
+                               href="{{ route('favorites.index') }}">
+                                <i class="fas fa-star me-1"></i> Favorites
+                            </a>
+                        </li>
+                        <li class="nav-item">
                             <a class="nav-link {{ request()->routeIs('numbers.*') ? 'active fw-semibold' : '' }}"
                                href="{{ route('numbers.index') }}">
                                 <i class="fas fa-phone me-1"></i> My Numbers
