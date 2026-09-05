@@ -39,7 +39,7 @@
         </div>
     @else
         <div class="card border-0 shadow-sm">
-            <div class="list-group list-group-flush">
+            <div class="list-group list-group-flush" id="conversationList">
                 @foreach($conversations as $conversation)
                     @include('partials.conversation-row')
                 @endforeach
@@ -48,4 +48,33 @@
         <div class="mt-4 d-flex justify-content-center">{{ $conversations->links() }}</div>
     @endif
 </div>
+
+@include('partials.poller')
+
+@push('scripts')
+<script>
+@if($conversations->onFirstPage())
+(function () {
+    const list = document.getElementById('conversationList');
+    let since = @json($syncedAt->toIso8601String());
+
+    window.startPolling({
+        url: @json(route('messages.updates')),
+        // number_id scopes "mine" to this one number, as the page itself does.
+        params: () => ({ since: since, number_id: @json($number->id) }),
+        onData(data) {
+            since = data.server_time;
+            if (!data.conversations.length) return;
+            if (!list) return window.location.reload();
+
+            data.conversations.slice().reverse().forEach(function (row) {
+                list.querySelector('[data-conversation-id="' + row.id + '"]')?.remove();
+                list.insertAdjacentHTML('afterbegin', row.html);
+            });
+        },
+    });
+})();
+@endif
+</script>
+@endpush
 @endsection

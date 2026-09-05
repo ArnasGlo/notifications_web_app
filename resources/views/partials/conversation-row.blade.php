@@ -3,6 +3,10 @@
     Requires $conversation (with numberOne, numberTwo, latestMessage and the
     unread_count withCount alias) and $accessibleIds — the viewer's numbers,
     which decide which side of the pair is "theirs".
+
+    Also re-rendered on its own by ConversationController@listUpdates when
+    polling finds the thread has moved; data-conversation-id is how the page
+    finds the row to replace.
 --}}
 @php
     $counterpart = $conversation->counterpartFor($accessibleIds);
@@ -12,7 +16,8 @@
 @endphp
 
 <a href="{{ route('conversations.show', $conversation) }}"
-   class="list-group-item list-group-item-action px-4 py-3 {{ $unread ? 'bg-light' : '' }}">
+   class="list-group-item list-group-item-action px-4 py-3 {{ $unread ? 'bg-light' : '' }}"
+   data-conversation-id="{{ $conversation->id }}">
     <div class="d-flex align-items-center gap-3">
 
         <div class="rounded-circle d-flex align-items-center justify-content-center flex-shrink-0

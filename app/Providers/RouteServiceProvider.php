@@ -46,6 +46,13 @@ class RouteServiceProvider extends ServiceProvider
             return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
         });
 
+        // Polling runs at ~15 requests a minute per open page (one every 4s), so
+        // this leaves room for a few tabs and the odd retry while still bounding
+        // a client that loses its backoff.
+        RateLimiter::for('polling', function (Request $request) {
+            return Limit::perMinute(60)->by($request->user()?->id ?: $request->ip());
+        });
+
         // Mirrors the web login's ThrottlesLogins lockout (5 attempts per minute,
         // keyed by email + IP so a shared NAT can't lock out unrelated users).
         RateLimiter::for('login', function (Request $request) {

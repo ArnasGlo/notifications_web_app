@@ -47,7 +47,10 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/numbers/{number}/messages', [MessageController::class, 'numberInbox']);
 
     Route::get('/conversations', [ConversationController::class, 'index']);
+    // Declared before /conversations/{conversation}, or "updates" is captured as an id.
+    Route::get('/conversations/updates', [ConversationController::class, 'updates'])->middleware('throttle:polling');
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
+    Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages'])->middleware('throttle:polling');
 
     Route::get('/messages/compose-data', [MessageController::class, 'composeData']);
     Route::get('/messages', [MessageController::class, 'index']);

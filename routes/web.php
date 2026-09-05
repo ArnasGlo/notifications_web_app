@@ -40,6 +40,14 @@ Route::middleware('auth')->group(function () {
     // Messaging
     Route::get('messages', [ConversationController::class, 'index'])->name('messages.index');
     Route::get('conversations/{conversation}', [ConversationController::class, 'show'])->name('conversations.show');
+
+    // Polling: what an open page asks for every few seconds. JSON + rendered
+    // Blade partials; the Android-facing JSON lives in routes/api.php.
+    Route::middleware('throttle:polling')->group(function () {
+        Route::get('messages/updates', [ConversationController::class, 'listUpdates'])->name('messages.updates');
+        Route::get('conversations/{conversation}/updates', [ConversationController::class, 'updates'])->name('conversations.updates');
+    });
+
     Route::get('messages/compose', [MessageController::class, 'compose'])->name('messages.compose');
     Route::post('messages', [MessageController::class, 'store'])->name('messages.store');
 

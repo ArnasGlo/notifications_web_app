@@ -67,9 +67,11 @@
             @endif
 
             <div class="card border-0 shadow-sm mb-3">
-                <div class="card-body p-3 p-md-4" style="background:#f7f8fa">
+                {{-- data-last-id is the polling cursor: the newest message already on screen. --}}
+                <div class="card-body p-3 p-md-4" style="background:#f7f8fa"
+                     id="messageStream" data-last-id="{{ $messages->getCollection()->max('id') ?? 0 }}">
                     @if($messages->isEmpty())
-                        <p class="text-center text-muted my-4 mb-0">No messages in this conversation yet.</p>
+                        <p class="text-center text-muted my-4 mb-0" id="emptyThread">No messages in this conversation yet.</p>
                     @else
                         @php $lastDate = null; @endphp
                         @foreach($messages as $message)
@@ -90,22 +92,7 @@
                                 @php $lastDate = $stamp->toDateString(); @endphp
                             @endif
 
-                            <div class="d-flex mb-2 {{ $outbound ? 'justify-content-end' : 'justify-content-start' }}">
-                                <div class="px-3 py-2 rounded-3 shadow-sm {{ $outbound ? 'bg-primary text-white' : 'bg-white border' }}"
-                                     style="max-width:78%">
-                                    <div>{{ $message->body }}</div>
-                                    <div class="small mt-1 text-end {{ $outbound ? 'text-white-50' : 'text-muted' }}">
-                                        {{ $stamp->format('H:i') }}
-                                        @if($message->status === 'queued')
-                                            <i class="fas fa-clock ms-1" title="Queued — recipient is busy"></i>
-                                        @elseif($outbound && $message->status === 'read')
-                                            <i class="fas fa-check-double ms-1" title="Read"></i>
-                                        @elseif($outbound)
-                                            <i class="fas fa-check ms-1" title="Sent"></i>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
+                            @include('partials.message-bubble', ['message' => $message, 'outbound' => $outbound])
                         @endforeach
                     @endif
                 </div>
@@ -136,6 +123,8 @@
     </div>
 </div>
 
+@include('partials.poller')
+
 @push('scripts')
 <script>
 // Land at the live end of the thread.
@@ -145,6 +134,39 @@ document.addEventListener('composer:changed', function (e) {
     const btn = document.getElementById('sendBtn');
     if (btn) btn.disabled = e.target.value.trim().length === 0;
 });
+
+@if($messages->onFirstPage())
+// Live thread: ask for anything newer than the last message we have. Only on
+// page one — older pages are history and must not grow a tail.
+(function () {
+    const stream = document.getElementById('messageStream');
+    let lastId = Number(stream.dataset.lastId || 0);
+
+    window.startPolling({
+        url: @json(route('conversations.updates', $conversation)),
+        params: () => ({ after_id: lastId }),
+        onData(data) {
+            if (!data.messages.length) return;
+
+            // Only auto-scroll if the reader is already at the bottom; yanking
+            // the page while they read older messages would be worse than not.
+            const atBottom = (window.innerHeight + window.scrollY) >= (document.body.offsetHeight - 150);
+
+            document.getElementById('emptyThread')?.remove();
+
+            data.messages.forEach(function (message) {
+                if (!stream.querySelector('[data-message-id="' + message.id + '"]')) {
+                    stream.insertAdjacentHTML('beforeend', message.html);
+                }
+            });
+
+            lastId = data.last_id;
+
+            if (atBottom) window.scrollTo(0, document.body.scrollHeight);
+        },
+    });
+})();
+@endif
 </script>
 @endpush
 @endsection

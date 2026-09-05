@@ -191,6 +191,7 @@ In development, the default file-based session/cache and synchronous queue need 
 - **Delegate access** — open a number's assistants page, copy its delegation link, and send it to whoever should manage it. They accept the link while logged in to become an assistant; you can revoke access from the same page.
 - **Send a message** — "Compose" → pick one of your own active numbers as sender, a receiver number, and a template.
 - **Read & reply** — opening a message marks it as read; you can reply using any template flagged as reply-eligible in that category.
+- **Live updates** — the conversation list and an open chat refresh themselves every few seconds, so incoming messages appear without reloading. Polling pauses while the browser tab is in the background.
 - **Change status** — toggle Active / Busy / Do Not Disturb from the top bar; this immediately affects how your numbers handle incoming messages.
 - **Blocking** — add rules (by number, user, city, or country) from a number's blocking page.
 - **Admin panel** — `/admin/dashboard`, for managing users, numbers, categories, and templates.

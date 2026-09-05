@@ -82,7 +82,7 @@
         </div>
     @else
         <div class="card border-0 shadow-sm">
-            <div class="list-group list-group-flush">
+            <div class="list-group list-group-flush" id="conversationList">
                 @foreach($conversations as $conversation)
                     @include('partials.conversation-row')
                 @endforeach
@@ -92,11 +92,42 @@
     @endif
 </div>
 
+@include('partials.poller')
+
 @push('scripts')
 <script>
 document.getElementById('conversationJump')?.addEventListener('change', function () {
     if (this.value) window.location = this.value;
 });
+
+@if($conversations->onFirstPage())
+// Live list: ask for threads whose activity moved since the last sync. Only on
+// page one — rows arriving at the top of page two would be out of place.
+(function () {
+    const list = document.getElementById('conversationList');
+    const filter = @json(request('q') ?? '');
+    let since = @json($syncedAt->toIso8601String());
+
+    window.startPolling({
+        url: @json(route('messages.updates')),
+        params: () => ({ since: since, q: filter }),
+        onData(data) {
+            since = data.server_time;
+            if (!data.conversations.length) return;
+
+            // The page is showing the empty state, so there is no list to grow.
+            if (!list) return window.location.reload();
+
+            // Payload is newest-activity-first; inserting each at the top in
+            // reverse leaves the list in exactly that order.
+            data.conversations.slice().reverse().forEach(function (row) {
+                list.querySelector('[data-conversation-id="' + row.id + '"]')?.remove();
+                list.insertAdjacentHTML('afterbegin', row.html);
+            });
+        },
+    });
+})();
+@endif
 </script>
 @endpush
 @endsection
