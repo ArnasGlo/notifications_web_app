@@ -2,15 +2,19 @@
 
 namespace App\Http\Controllers;
 
+use App\Actions\ReplyToMessage;
 use App\Actions\SendMessage;
 use App\Exceptions\CannotSendMessage;
+use App\Models\Message;
 use App\Models\MessageCategory;
+use App\Models\MessageTemplate;
 use Illuminate\Http\Request;
 
 /**
  * Composing and sending. Reading happens in ConversationController — the chat
- * page replaced the per-message thread view, so there is no web `show`/`reply`
- * here any more; the API keeps both (ANDROID_APP_CONTEXT.md §6 rows 16-17).
+ * page replaced the per-message thread view, so there is no web `show` here.
+ * Replies are sent through store() with a parent_id, from the chat composer's
+ * reply mode.
  */
 class MessageController extends Controller
 {
@@ -21,26 +25,37 @@ class MessageController extends Controller
         return view('messages.compose', compact('myNumbers', 'categories'));
     }
 
-    public function store(Request $request, SendMessage $send)
+    public function store(Request $request, SendMessage $send, ReplyToMessage $reply)
     {
         $data = $request->validate([
-            'sender_number_id' => 'required|exists:numbers,id',
-            'receiver_number_id' => 'required|exists:numbers,id|different:sender_number_id',
+            // A reply's sender and receiver come from the message it answers.
+            'parent_id' => 'nullable|integer|exists:messages,id',
+            'sender_number_id' => 'required_without:parent_id|nullable|exists:numbers,id',
+            'receiver_number_id' => 'required_without:parent_id|nullable|exists:numbers,id|different:sender_number_id',
             'body' => 'required_without:template_id|nullable|string|max:255',
             'template_id' => 'nullable|exists:message_templates,id',
         ]);
 
         try {
-            $message = $send(auth()->user(), $data);
+            $message = empty($data['parent_id'])
+                ? $send(auth()->user(), $data)
+                : $reply(
+                    auth()->user(),
+                    Message::findOrFail($data['parent_id']),
+                    empty($data['template_id']) ? null : MessageTemplate::findOrFail($data['template_id']),
+                    $data['body'] ?? null,
+                );
         } catch (CannotSendMessage $e) {
             abort_if($e->status === 403, 403);
 
-            return back()->with('error', $e->getMessage());
+            // Keep what was typed. The page re-renders from current state, and
+            // reply mode is only restored if the message can still be replied to.
+            return back()->withInput()->with('error', $e->getMessage());
         }
 
-        // Land in the thread the message just joined — right for both entry
-        // points: the compose wizard and the chat composer.
+        // Land in the thread the message just joined — right for every entry
+        // point: the compose wizard, the chat composer and its reply mode.
         return redirect()->route('conversations.show', $message->conversation_id)
-            ->with('success', 'Message sent!');
+            ->with('success', $message->parent_id ? 'Reply sent!' : 'Message sent!');
     }
 }

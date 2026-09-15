@@ -69,7 +69,7 @@ Route::middleware(['auth', 'admin'])->prefix('admin')->name('admin.')->group(fun
     Route::resource('users', AdminUserController::class);
     Route::resource('numbers', AdminNumberController::class);
     Route::resource('categories', MessageCategoryController::class);
-    Route::resource('templates', App\Http\Controllers\Admin\MessageTemplateController::class);
+    Route::resource('templates', App\Http\Controllers\Admin\MessageTemplateController::class)->except(['show']);
 });
 
 Route::get('/admin', fn() => redirect()->route('admin.dashboard'));

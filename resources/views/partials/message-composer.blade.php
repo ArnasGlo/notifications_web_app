@@ -5,9 +5,20 @@
     non-reply templates (the same payload MessageController@compose already builds
     and GET /api/messages/compose-data returns).
 
-    Emits `body` (what actually gets sent) and a hidden `template_id` recording
-    which canned response seeded it, if any. Editing the text after inserting a
-    template is expected: body wins, template_id is only provenance.
+    Emits `body` (what actually gets sent) and a hidden `template_id` naming the
+    saved reply last inserted, if any. Editing the text after inserting one is
+    expected: Message::contentFrom() keeps template_id only while the body is still
+    exactly that template, so this field doesn't have to track edits.
+
+    Reply mode (chat page only) — optional:
+      $replies     true to enable it. A bubble's Reply action ([data-reply-to])
+                   switches the composer to answering that message: parent_id is
+                   set, a "Replying to" banner shows, and "/" lists only that
+                   message's reply options. Absent on the compose page.
+      $replyOnly   true for assistants, who may reply but not start a message:
+                   the box stays locked until a message is picked.
+      $replyingTo  the message to reopen reply mode on after a bounced send,
+                   already re-checked by the controller; null otherwise.
 --}}
 @php
     // Built here rather than inline in @json(...): Blade's directive argument
@@ -17,16 +28,37 @@
         'icon' => $c->icon,
         'templates' => $c->templates->map(fn ($t) => ['id' => $t->id, 'body' => $t->body])->values(),
     ])->values();
+
+    $replies = $replies ?? false;
+    $replyOnly = $replies && ($replyOnly ?? false);
+    $initialReply = $replies && ! empty($replyingTo) ? [
+        'id' => $replyingTo->id,
+        'snippet' => \Illuminate\Support\Str::limit($replyingTo->body, 60),
+        'groups' => $replyingTo->replyOptionGroups(),
+    ] : null;
+    $locked = $replyOnly && ! $initialReply;
 @endphp
 
-<div class="position-relative" id="composerWrap">
+<div class="position-relative" id="composerWrap" data-reply-only="{{ $replyOnly ? '1' : '0' }}">
+    @if($replies)
+        <input type="hidden" name="parent_id" id="composerParentId" value="{{ $initialReply['id'] ?? '' }}">
+
+        <div id="composerReplyBanner"
+             class="alert alert-secondary py-1 px-2 mb-2 small d-flex align-items-center {{ $initialReply ? '' : 'd-none' }}">
+            <i class="fas fa-reply me-2"></i>
+            <span class="text-truncate">Replying to: <span id="composerReplySnippet">{{ $initialReply['snippet'] ?? '' }}</span></span>
+            <button type="button" class="btn-close ms-auto" id="composerReplyCancel" aria-label="Cancel reply"></button>
+        </div>
+    @endif
+
     <textarea name="body"
               id="composerBody"
               rows="3"
               maxlength="255"
               class="form-control @error('body') is-invalid @enderror"
-              placeholder="Type a message, or press / to insert a saved reply…"
-              autocomplete="off">{{ old('body') }}</textarea>
+              placeholder="{{ $locked ? 'As an assistant you can reply to messages — use the reply arrow on one.' : 'Type a message, or press / to insert a saved reply…' }}"
+              autocomplete="off"
+              @disabled($locked)>{{ old('body') }}</textarea>
 
     <input type="hidden" name="template_id" id="composerTemplateId" value="{{ old('template_id') }}">
 
@@ -52,12 +84,27 @@
 (function () {
     const groups = @json($slashGroups);
 
+    const wrap    = document.getElementById('composerWrap');
     const body    = document.getElementById('composerBody');
     const hidden  = document.getElementById('composerTemplateId');
     const menu    = document.getElementById('slashMenu');
     const list    = document.getElementById('slashList');
     const counter = document.getElementById('composerCount');
     if (!body) return;
+
+    // Reply mode: present only where the page enabled it.
+    const parentInput = document.getElementById('composerParentId');
+    const banner      = document.getElementById('composerReplyBanner');
+    const snippet     = document.getElementById('composerReplySnippet');
+    const replyOnly   = wrap.dataset.replyOnly === '1';
+    const placeholders = {
+        message: 'Type a message, or press / to insert a saved reply…',
+        reply:   'Type your reply, or press / for suggested answers…',
+        locked:  'As an assistant you can reply to messages — use the reply arrow on one.',
+    };
+
+    let activeGroups = groups;   // what "/" lists: compose templates, or one message's reply options
+    let replying = false;
 
     const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28);
     let items = [];      // flattened, currently visible
@@ -73,7 +120,7 @@
     function render(q) {
         list.innerHTML = '';
         items = [];
-        groups.forEach(g => {
+        activeGroups.forEach(g => {
             const matches = g.templates.filter(t =>
                 q === '' || slug(t.body).includes(q) || t.body.toLowerCase().includes(q) || g.name.toLowerCase().includes(q)
             );
@@ -97,7 +144,9 @@
         });
 
         if (!items.length) {
-            list.innerHTML = '<div class="list-group-item small text-muted">No saved replies match.</div>';
+            list.innerHTML = replying && !activeGroups.length
+                ? '<div class="list-group-item small text-muted">No suggested answers for this message — just type your reply.</div>'
+                : '<div class="list-group-item small text-muted">No saved replies match.</div>';
         }
         active = items.length ? 0 : -1;
         highlight();
@@ -134,9 +183,31 @@
         body.dispatchEvent(new CustomEvent('composer:changed', { bubbles: true }));
     }
 
+    // Enter or leave reply mode. reply = {id, snippet, groups}, or null to leave.
+    // A template picked in the other mode isn't valid in this one, so it's
+    // forgotten — except when restoring after a bounced send, where it's kept.
+    function setReply(reply, restoring) {
+        if (!parentInput) return;
+
+        replying = !!reply;
+        parentInput.value = reply ? reply.id : '';
+        activeGroups = reply ? reply.groups : groups;
+        if (!restoring) hidden.value = '';
+
+        snippet.textContent = reply ? reply.snippet : '';
+        banner.classList.toggle('d-none', !reply);
+
+        body.disabled = replyOnly && !reply;
+        body.placeholder = reply ? placeholders.reply : (replyOnly ? placeholders.locked : placeholders.message);
+
+        close();
+        if (reply && !restoring) body.focus();
+        sync();
+    }
+
     body.addEventListener('input', () => {
-        // Typing after inserting means the text no longer matches the template
-        // verbatim, but template_id stays as provenance of where it came from.
+        // Typing after inserting may mean the text is no longer the template
+        // verbatim; the server drops template_id in that case.
         const q = slashQuery();
         q === null ? close() : render(q);
         sync();
@@ -152,7 +223,25 @@
     });
 
     body.addEventListener('blur', () => setTimeout(close, 120));
-    sync();
+
+    if (parentInput) {
+        // Delegated, so bubbles appended later by polling work too.
+        document.addEventListener('click', e => {
+            const button = e.target.closest('[data-reply-to]');
+            if (!button) return;
+            setReply({
+                id: button.dataset.replyTo,
+                snippet: button.dataset.replySnippet,
+                groups: JSON.parse(button.dataset.replyOptions || '[]'),
+            }, false);
+        });
+
+        document.getElementById('composerReplyCancel').addEventListener('click', () => setReply(null, false));
+
+        setReply(@json($initialReply), true);
+    } else {
+        sync();
+    }
 })();
 </script>
 @endpush

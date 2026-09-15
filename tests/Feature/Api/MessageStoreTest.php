@@ -205,10 +205,10 @@ class MessageStoreTest extends TestCase
             ->assertJsonPath('data.template.id', $template->id);
     }
 
-    public function test_typed_text_overrides_the_template_body(): void
+    public function test_edited_template_text_is_stored_as_typed_text(): void
     {
-        // The composer inserts a canned response as editable text, so what was
-        // sent can differ from the template it came from.
+        // template_id means "the body IS this template". The composer inserts a
+        // canned response as editable text, so once it's edited it's no longer that.
         [$owner, $sender, $receiver] = $this->activePair();
         $template = MessageTemplate::factory()
             ->for(MessageCategory::factory()->create(), 'category')
@@ -223,12 +223,32 @@ class MessageStoreTest extends TestCase
             ])
             ->assertStatus(201)
             ->assertJsonPath('data.body', 'Can you talk in 10 minutes?')
-            ->assertJsonPath('data.template.id', $template->id);
+            ->assertJsonPath('data.template', null);
 
         $this->assertDatabaseHas('messages', [
             'body' => 'Can you talk in 10 minutes?',
-            'template_id' => $template->id,
+            'template_id' => null,
         ]);
+    }
+
+    public function test_template_text_sent_unedited_keeps_its_template(): void
+    {
+        [$owner, $sender, $receiver] = $this->activePair();
+        $template = MessageTemplate::factory()
+            ->for(MessageCategory::factory()->create(), 'category')
+            ->create(['body' => 'Can you talk?']);
+
+        $this->actingAs($owner, 'sanctum')
+            ->postJson('/api/messages', [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+                'body' => 'Can you talk?',
+            ])
+            ->assertStatus(201)
+            ->assertJsonPath('data.template.id', $template->id);
+
+        $this->assertDatabaseHas('messages', ['body' => 'Can you talk?', 'template_id' => $template->id]);
     }
 
     public function test_store_rejects_a_body_over_255_characters(): void

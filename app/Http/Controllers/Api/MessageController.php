@@ -97,10 +97,11 @@ class MessageController extends Controller
 
     public function reply(MessageReplyRequest $request, Message $message, ReplyToMessage $replyTo)
     {
-        $template = MessageTemplate::findOrFail($request->validated('template_id'));
+        $templateId = $request->validated('template_id');
+        $template = $templateId ? MessageTemplate::findOrFail($templateId) : null;
 
         try {
-            $reply = $replyTo($request->user(), $message, $template);
+            $reply = $replyTo($request->user(), $message, $template, $request->validated('body'));
         } catch (CannotSendMessage $e) {
             abort($e->status, $e->getMessage());
         }

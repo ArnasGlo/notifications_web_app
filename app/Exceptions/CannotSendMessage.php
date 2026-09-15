@@ -47,11 +47,6 @@ class CannotSendMessage extends Exception
         return new self('You cannot reply to a reply.', 422);
     }
 
-    public static function alreadyReplied(): self
-    {
-        return new self('A reply has already been sent for this message.', 422);
-    }
-
     public static function templateNotValidAsReply(): self
     {
         return new self('This template cannot be used as a reply to this message.', 422);

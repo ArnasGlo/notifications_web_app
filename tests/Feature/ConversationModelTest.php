@@ -93,6 +93,8 @@ class ConversationModelTest extends TestCase
             'receiver_number_id' => $receiverNumber->id,
             'template_id' => $template->id,
         ]);
+        // Replies must be mapped to the prompt; the backfill maps this category.
+        $this->rerunMigration('2026_09_15_000001_create_message_template_replies_table');
 
         $reply = app(ReplyToMessage::class)($receiverOwner, $message, $replyTemplate);
 

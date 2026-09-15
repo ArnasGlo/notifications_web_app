@@ -39,20 +39,16 @@ class SendMessage
             throw CannotSendMessage::undeliverable();
         }
 
-        $templateId = $attributes['template_id'] ?? null;
-        $body = $attributes['body'] ?? null;
+        $template = isset($attributes['template_id'])
+            ? MessageTemplate::findOrFail($attributes['template_id'])
+            : null;
 
-        // A template with no body override sends verbatim; this is what the web
-        // compose wizard does, and what "send this canned response" means for the API.
-        if (blank($body)) {
-            $body = MessageTemplate::findOrFail($templateId)->body;
-        }
-
-        return Message::create([
+        // Both composers let the user edit an inserted template; contentFrom()
+        // decides whether the result is still that template or typed text, here
+        // rather than in either client.
+        return Message::create(Message::contentFrom($template, $attributes['body'] ?? null) + [
             'sender_number_id' => $sender->id,
             'receiver_number_id' => $receiver->id,
-            'template_id' => $templateId,
-            'body' => $body,
             'status' => $receiver->user->status === 'busy' ? 'queued' : 'sent',
         ]);
     }

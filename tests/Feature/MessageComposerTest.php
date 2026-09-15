@@ -88,4 +88,50 @@ class MessageComposerTest extends TestCase
         // Composing drops you into the resulting thread, not back to the list.
         $response->assertRedirect(route('conversations.show', Message::firstOrFail()->conversation_id));
     }
+
+    public function test_editing_an_inserted_template_sends_it_without_the_template(): void
+    {
+        // The hidden template_id survives edits in the browser; the server is what
+        // decides the body is no longer that template.
+        $user = User::factory()->create();
+        $sender = Number::factory()->for($user)->create();
+        $receiver = Number::factory()->create();
+        $template = MessageTemplate::factory()
+            ->for(MessageCategory::factory()->create(), 'category')
+            ->create(['body' => 'Call me back']);
+
+        $this->actingAs($user)
+            ->from(route('messages.compose'))
+            ->post(route('messages.store'), [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+                'body' => 'Call me back after 6',
+            ]);
+
+        $this->assertDatabaseHas('messages', ['body' => 'Call me back after 6', 'template_id' => null]);
+    }
+
+    public function test_an_inserted_template_sent_unedited_keeps_its_template(): void
+    {
+        $user = User::factory()->create();
+        $sender = Number::factory()->for($user)->create();
+        $receiver = Number::factory()->create();
+        $template = MessageTemplate::factory()
+            ->for(MessageCategory::factory()->create(), 'category')
+            ->create(['body' => 'Call me back']);
+
+        $this->actingAs($user)
+            ->from(route('messages.compose'))
+            ->post(route('messages.store'), [
+                'sender_number_id' => $sender->id,
+                'receiver_number_id' => $receiver->id,
+                'template_id' => $template->id,
+                // A stray trailing newline from the textarea is trimmed on the way
+                // in, so it isn't an edit.
+                'body' => "Call me back\n",
+            ]);
+
+        $this->assertDatabaseHas('messages', ['body' => 'Call me back', 'template_id' => $template->id]);
+    }
 }

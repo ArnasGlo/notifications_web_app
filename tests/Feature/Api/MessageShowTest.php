@@ -175,6 +175,10 @@ class MessageShowTest extends TestCase
             'template_id' => $template->id,
         ]);
 
+        // Reply options come from message_template_replies now; its backfill is
+        // what turns this category into mappings.
+        $this->rerunMigration('2026_09_15_000001_create_message_template_replies_table');
+
         $response = $this->actingAs($owner, 'sanctum')->getJson("/api/messages/{$message->id}");
 
         $response->assertStatus(200)

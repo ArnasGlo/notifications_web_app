@@ -59,13 +59,16 @@
                                class="btn btn-outline-primary" title="Edit">
                                 <i class="fas fa-edit"></i>
                             </a>
+                            {{-- Templates are never deleted: this retires one (sets it inactive). --}}
+                            @if($template->is_active)
                             <form action="{{ route('admin.templates.destroy', $template) }}" method="POST"
-                                  onsubmit="return confirm('Delete this template?')">
+                                  onsubmit="return confirm('Deactivate this template? It will no longer be offered to users. Messages already sent with it keep it.')">
                                 @csrf @method('DELETE')
-                                <button class="btn btn-outline-danger" title="Delete">
-                                    <i class="fas fa-trash"></i>
+                                <button class="btn btn-outline-warning" title="Deactivate">
+                                    <i class="fas fa-ban mr-1"></i> Deactivate
                                 </button>
                             </form>
+                            @endif
                         </div>
                     </td>
                 </tr>

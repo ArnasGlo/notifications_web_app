@@ -70,6 +70,8 @@
                 </div>
             </div>
 
+            @include('admin.templates.partials.mapping')
+
             <div class="mt-2">
                 <button type="submit" class="btn btn-primary">
                     <i class="fas fa-save mr-1"></i> Create Template

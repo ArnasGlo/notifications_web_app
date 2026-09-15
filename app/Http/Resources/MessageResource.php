@@ -29,8 +29,8 @@ class MessageResource extends JsonResource
                 'user_id' => $this->receiver->user_id,
             ],
             'body' => $this->body,
-            // Provenance only — null when the message was typed rather than
-            // seeded from a canned response. `body` is what was actually sent.
+            // The template this body is verbatim — null when the message was
+            // typed, including an inserted template edited before sending.
             'template' => $this->template ? [
                 'id' => $this->template->id,
                 'body' => $this->template->body,

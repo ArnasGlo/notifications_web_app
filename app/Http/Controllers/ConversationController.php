@@ -7,6 +7,7 @@ use App\Models\Message;
 use App\Models\MessageCategory;
 use App\Models\Number;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 
 class ConversationController extends Controller
 {
@@ -79,25 +80,49 @@ class ConversationController extends Controller
         // re-sorted within the page so it still reads top-to-bottom — the "load
         // older" shape every chat client uses.
         $messages = $conversation->messages()
-            ->with(['sender', 'receiver'])
+            ->forThread()
             ->latest()
             ->paginate(50);
 
         $messages->setCollection($messages->getCollection()->sortBy('created_at')->values());
 
         $counterpart = $conversation->counterpartFor($accessibleIds);
+        $myNumber = $conversation->myNumberFor($accessibleIds);
 
         return view('conversations.show', [
             'conversation' => $conversation,
             'messages' => $messages,
-            'myNumber' => $conversation->myNumberFor($accessibleIds),
+            'myNumber' => $myNumber,
             'counterpart' => $counterpart,
             'counterpartFavorite' => $counterpart
                 ? auth()->user()->favorites()->where('number_id', $counterpart->id)->first()
                 : null,
             'accessibleIds' => $accessibleIds,
             'categories' => MessageCategory::composePayload(),
+            // Assistants may reply but not start messages (ANDROID_APP_CONTEXT.md §3).
+            'replyOnly' => $myNumber && $myNumber->user_id !== auth()->id(),
+            'replyingTo' => $this->restorableReply($conversation, $accessibleIds),
         ]);
+    }
+
+    /**
+     * The message the composer was replying to when the last send bounced back
+     * (a validation error or a refusal), if it can still be replied to from here.
+     *
+     * Re-checked rather than trusted, so reply mode never reopens on a message
+     * that stopped being eligible since the page was loaded.
+     */
+    private function restorableReply(Conversation $conversation, Collection $accessibleIds): ?Message
+    {
+        $parentId = old('parent_id');
+
+        if (blank($parentId)) {
+            return null;
+        }
+
+        $message = $conversation->messages()->forThread()->find($parentId);
+
+        return $message?->canBeRepliedToFrom($accessibleIds) ? $message : null;
     }
 
     // ── Polling endpoints ────────────────────────────────────────────────────
@@ -122,7 +147,7 @@ class ConversationController extends Controller
         $conversation->markInboundRead($accessibleIds);
 
         $messages = $conversation->messagesAfter($afterId)
-            ->with(['sender', 'receiver'])
+            ->forThread()
             ->get();
 
         return response()->json([
@@ -131,6 +156,7 @@ class ConversationController extends Controller
                 'html' => view('partials.message-bubble', [
                     'message' => $message,
                     'outbound' => $accessibleIds->contains($message->sender_number_id),
+                    'accessibleIds' => $accessibleIds,
                 ])->render(),
             ])->values(),
             'last_id' => $messages->max('id') ?? $afterId,

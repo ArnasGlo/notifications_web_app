@@ -8,40 +8,47 @@ use App\Models\MessageTemplate;
 use App\Models\User;
 
 /**
- * The reply sequence both MessageController@reply methods used to duplicate.
+ * The reply sequence shared by the web composer (MessageController@store with a
+ * parent_id) and the API (Api\MessageController@reply).
  *
- * Replies deliberately bypass the DND / blocking / busy checks that SendMessage
- * applies and are always stored as 'sent' — a documented asymmetry
- * (ANDROID_APP_CONTEXT.md §3), not an oversight.
+ * A reply is a mapped template, typed text, or a template edited into typed text.
+ * Which of those it is decides the delivery checks:
+ *
+ *  - Template replies skip the DND and block checks. Their content is
+ *    admin-controlled — only answers mapped to the original prompt — so the
+ *    original sender can't receive anything they didn't in effect ask for.
+ *  - Free-text replies enforce DND and blocks. A message can be replied to any
+ *    number of times, so an exempt free-text path would be an unlimited way to
+ *    message someone who is on DND or has blocked you, and would make both
+ *    unenforceable.
+ *  - Every reply skips the busy queue and is stored as 'sent' — a documented
+ *    asymmetry with SendMessage (ANDROID_APP_CONTEXT.md §3).
  */
 class ReplyToMessage
 {
     /**
      * @throws CannotSendMessage
      */
-    public function __invoke(User $actor, Message $message, MessageTemplate $template): Message
+    public function __invoke(User $actor, Message $message, ?MessageTemplate $template, ?string $body = null): Message
     {
-        if (! $actor->accessibleNumberIds()->contains($message->receiver_number_id)) {
-            throw CannotSendMessage::notOnTheReceivingSide();
+        if ($refusal = $message->replyRefusal($actor->accessibleNumberIds())) {
+            throw $refusal;
         }
 
-        if ($message->isReply()) {
-            throw CannotSendMessage::cannotReplyToAReply();
-        }
+        $content = Message::contentFrom($template, $body);
 
-        if ($message->hasReply()) {
-            throw CannotSendMessage::alreadyReplied();
-        }
-
-        if (! $message->canBeRepliedWith($template)) {
+        if (is_null($content['template_id'])) {
+            // Free text: the original sender's number is the recipient here.
+            if (! $message->sender->canReceiveFrom($message->receiver)) {
+                throw CannotSendMessage::undeliverable();
+            }
+        } elseif (! $message->canBeRepliedWith($template)) {
             throw CannotSendMessage::templateNotValidAsReply();
         }
 
-        return Message::create([
+        return Message::create($content + [
             'sender_number_id' => $message->receiver_number_id,
             'receiver_number_id' => $message->sender_number_id,
-            'template_id' => $template->id,
-            'body' => $template->body,
             'parent_id' => $message->id,
             'status' => 'sent',
         ]);

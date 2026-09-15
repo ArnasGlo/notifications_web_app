@@ -92,7 +92,7 @@
                                 @php $lastDate = $stamp->toDateString(); @endphp
                             @endif
 
-                            @include('partials.message-bubble', ['message' => $message, 'outbound' => $outbound])
+                            @include('partials.message-bubble', ['message' => $message, 'outbound' => $outbound, 'accessibleIds' => $accessibleIds])
                         @endforeach
                     @endif
                 </div>
@@ -106,11 +106,15 @@
                             <input type="hidden" name="sender_number_id" value="{{ $myNumber->id }}">
                             <input type="hidden" name="receiver_number_id" value="{{ $counterpart->id }}">
 
-                            @include('partials.message-composer')
+                            @include('partials.message-composer', [
+                                'replies' => true,
+                                'replyOnly' => $replyOnly,
+                                'replyingTo' => $replyingTo,
+                            ])
 
                             <div class="d-grid mt-3">
                                 <button type="submit" class="btn btn-primary" id="sendBtn"
-                                        {{ trim(old('body', '')) === '' ? 'disabled' : '' }}>
+                                        {{ trim(old('body', '')) === '' || ($replyOnly && ! $replyingTo) ? 'disabled' : '' }}>
                                     <i class="fas fa-paper-plane me-2"></i> Send
                                 </button>
                             </div>
@@ -132,7 +136,8 @@ window.addEventListener('load', () => window.scrollTo(0, document.body.scrollHei
 
 document.addEventListener('composer:changed', function (e) {
     const btn = document.getElementById('sendBtn');
-    if (btn) btn.disabled = e.target.value.trim().length === 0;
+    // A locked composer (an assistant with no message picked) can't send either.
+    if (btn) btn.disabled = e.target.disabled || e.target.value.trim().length === 0;
 });
 
 @if($messages->onFirstPage())

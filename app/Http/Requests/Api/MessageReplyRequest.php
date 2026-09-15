@@ -14,7 +14,10 @@ class MessageReplyRequest extends FormRequest
     public function rules(): array
     {
         return [
-            'template_id' => ['required', 'exists:message_templates,id'],
+            // A mapped template, typed text, or both (text identical to the
+            // template keeps it; anything else is typed text). At least one.
+            'template_id' => ['required_without:body', 'nullable', 'exists:message_templates,id'],
+            'body' => ['required_without:template_id', 'nullable', 'string', 'max:255'],
         ];
     }
 }

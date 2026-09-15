@@ -21,6 +21,15 @@
             </div>
         @endif
 
+        {{-- Set by the controller when this template's reply mapping needs attention. --}}
+        @if(session('warning'))
+            <div class="alert alert-warning">
+                <i class="fas fa-exclamation-triangle mr-1"></i>
+                {{ session('warning') }}
+                <a href="#template-mapping" class="alert-link ml-1">Go to the mapping</a>
+            </div>
+        @endif
+
         <form action="{{ route('admin.templates.update', $template) }}" method="POST">
             @csrf @method('PUT')
 
@@ -64,6 +73,8 @@
                     </div>
                 </div>
             </div>
+
+            @include('admin.templates.partials.mapping')
 
             <div class="mt-2">
                 <button type="submit" class="btn btn-primary">
