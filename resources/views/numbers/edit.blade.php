@@ -79,6 +79,21 @@
                             <div class="form-text">Inactive numbers cannot send or receive messages.</div>
                         </div>
 
+                        <div class="mb-4">
+                            <input type="hidden" name="allow_typing" value="0">
+                            <div class="form-check form-switch">
+                                <input class="form-check-input" type="checkbox" role="switch"
+                                       name="allow_typing" id="allowTyping" value="1"
+                                       @checked(old('allow_typing', $number->allow_typing))>
+                                <label class="form-check-label fw-semibold" for="allowTyping">Allow typing in chat</label>
+                            </div>
+                            <div class="form-text">
+                                Off: this number sends templates only, until you agree to typing with a specific number.
+                                On: you agree to typing with everyone — requests are accepted automatically, and
+                                numbers that allow typing too can type with you right away.
+                            </div>
+                        </div>
+
                         {{-- Invite link (read-only, just for reference) --}}
                         <div class="mb-4 p-3 bg-light rounded">
                             <label class="form-label text-muted small fw-semibold mb-1">INVITE LINK</label>

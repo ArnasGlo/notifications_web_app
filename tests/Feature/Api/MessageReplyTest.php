@@ -306,12 +306,16 @@ class MessageReplyTest extends TestCase
 
     // ── Free-text replies (Slice 3) ──────────────────────────────────────────
 
-    /** @return array{0: Message, 1: User, 2: MessageTemplate} a message to $receiverOwner with one mapped reply template */
+    /**
+     * Both numbers allow typing, so free text reaches the rules these tests check.
+     *
+     * @return array{0: Message, 1: User, 2: MessageTemplate} a message to $receiverOwner with one mapped reply template
+     */
     private function repliableMessage(?User $senderOwner = null): array
     {
-        $senderNumber = Number::factory()->for($senderOwner ?? User::factory()->create())->create();
+        $senderNumber = Number::factory()->for($senderOwner ?? User::factory()->create())->allowsTyping()->create();
         $receiverOwner = User::factory()->create();
-        $receiverNumber = Number::factory()->for($receiverOwner)->create();
+        $receiverNumber = Number::factory()->for($receiverOwner)->allowsTyping()->create();
         [$message, $category] = $this->messageWithCategory($senderNumber, $receiverNumber);
         $replyTemplate = MessageTemplate::factory()->for($category, 'category')->reply()->create(['body' => 'On my way']);
         $this->mapRepliesByCategory();

@@ -43,6 +43,7 @@ class ConversationResource extends JsonResource
                 'is_outbound' => $latest->sender_number_id === $this->myNumber?->id,
             ] : null,
             'unread_count' => (int) ($this->unread_count ?? 0),
+            'typing' => $this->typingStateFor($this->myNumber, $request->user()),
             'last_message_at' => $this->last_message_at,
         ];
     }

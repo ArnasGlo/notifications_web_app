@@ -1,5 +1,6 @@
 {{--
-    Free-text message composer with slash-command template insertion.
+    Message composer: slash-command template insertion, and free text where
+    typing is allowed with the other number.
 
     Requires $categories — active categories eager-loaded with their active,
     non-reply templates (the same payload MessageController@compose already builds
@@ -9,6 +10,12 @@
     saved reply last inserted, if any. Editing the text after inserting one is
     expected: Message::contentFrom() keeps template_id only while the body is still
     exactly that template, so this field doesn't have to track edits.
+
+    $typingAllowed — true when free text may be sent to the other number
+    (Conversation::typingAllowedBetween). When false the box is read-only and
+    only a whole template can be chosen, so the body is always exactly one. The
+    compose page, which learns the recipient later, switches it with
+    window.composerSetTyping(allowed). Defaults to false: templates only.
 
     Reply mode (chat page only) — optional:
       $replies     true to enable it. A bubble's Reply action ([data-reply-to])
@@ -37,9 +44,10 @@
         'groups' => $replyingTo->replyOptionGroups(),
     ] : null;
     $locked = $replyOnly && ! $initialReply;
+    $typingAllowed = $typingAllowed ?? false;
 @endphp
 
-<div class="position-relative" id="composerWrap" data-reply-only="{{ $replyOnly ? '1' : '0' }}">
+<div class="position-relative" id="composerWrap" data-reply-only="{{ $replyOnly ? '1' : '0' }}" data-typing="{{ $typingAllowed ? '1' : '0' }}">
     @if($replies)
         <input type="hidden" name="parent_id" id="composerParentId" value="{{ $initialReply['id'] ?? '' }}">
 
@@ -56,8 +64,8 @@
               rows="3"
               maxlength="255"
               class="form-control @error('body') is-invalid @enderror"
-              placeholder="{{ $locked ? 'As an assistant you can reply to messages — use the reply arrow on one.' : 'Type a message, or press / to insert a saved reply…' }}"
               autocomplete="off"
+              @readonly(! $typingAllowed)
               @disabled($locked)>{{ old('body') }}</textarea>
 
     <input type="hidden" name="template_id" id="composerTemplateId" value="{{ old('template_id') }}">
@@ -67,7 +75,7 @@
     @enderror
 
     <div class="d-flex justify-content-between align-items-center mt-1">
-        <small class="text-muted">Press <kbd>/</kbd> for saved replies</small>
+        <small class="text-muted" id="composerHint"></small>
         <small class="text-muted"><span id="composerCount">0</span>/255</small>
     </div>
 
@@ -96,15 +104,19 @@
     const parentInput = document.getElementById('composerParentId');
     const banner      = document.getElementById('composerReplyBanner');
     const snippet     = document.getElementById('composerReplySnippet');
+    const hint        = document.getElementById('composerHint');
     const replyOnly   = wrap.dataset.replyOnly === '1';
     const placeholders = {
-        message: 'Type a message, or press / to insert a saved reply…',
-        reply:   'Type your reply, or press / for suggested answers…',
-        locked:  'As an assistant you can reply to messages — use the reply arrow on one.',
+        message:       'Type a message, or press / to insert a saved reply…',
+        reply:         'Type your reply, or press / for suggested answers…',
+        messageChoose: 'Click here to choose a template…',
+        replyChoose:   'Click here to choose a suggested answer…',
+        locked:        'As an assistant you can reply to messages — use the reply arrow on one.',
     };
 
     let activeGroups = groups;   // what "/" lists: compose templates, or one message's reply options
     let replying = false;
+    let typingAllowed = wrap.dataset.typing === '1';
 
     const slug = s => s.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 28);
     let items = [];      // flattened, currently visible
@@ -145,7 +157,9 @@
 
         if (!items.length) {
             list.innerHTML = replying && !activeGroups.length
-                ? '<div class="list-group-item small text-muted">No suggested answers for this message — just type your reply.</div>'
+                ? (typingAllowed
+                    ? '<div class="list-group-item small text-muted">No suggested answers for this message — just type your reply.</div>'
+                    : '<div class="list-group-item small text-muted">No suggested answers for this message, and typing is not allowed with this number.</div>')
                 : '<div class="list-group-item small text-muted">No saved replies match.</div>';
         }
         active = items.length ? 0 : -1;
@@ -164,13 +178,21 @@
         active = -1;
     }
 
-    // Replace the "/query" token under the caret with the template text.
+    // Replace the "/query" token under the caret with the template text — or,
+    // with typing not allowed, the whole body, so it stays exactly one template.
     function choose(t) {
+        hidden.value = t.id;
+        if (!typingAllowed) {
+            body.value = t.body;
+            close();
+            sync();
+            return;
+        }
+
         const caret = body.selectionStart;
         const before = body.value.slice(0, caret).replace(/(^|\s)\/[\w-]*$/, '$1');
         const after = body.value.slice(caret);
         body.value = (before + t.body + after).slice(0, 255);
-        hidden.value = t.id;
         const pos = (before + t.body).length;
         body.focus();
         body.setSelectionRange(pos, pos);
@@ -182,6 +204,35 @@
         counter.textContent = body.value.length;
         body.dispatchEvent(new CustomEvent('composer:changed', { bubbles: true }));
     }
+
+    // The box's state follows from three things: an assistant's lock, reply
+    // mode, and whether typing is allowed.
+    function refresh() {
+        body.disabled = replyOnly && !replying;
+        body.readOnly = !typingAllowed;
+
+        if (body.disabled) {
+            body.placeholder = placeholders.locked;
+        } else if (typingAllowed) {
+            body.placeholder = replying ? placeholders.reply : placeholders.message;
+        } else {
+            body.placeholder = replying ? placeholders.replyChoose : placeholders.messageChoose;
+        }
+
+        hint.innerHTML = typingAllowed
+            ? 'Press <kbd>/</kbd> for saved replies'
+            : 'Templates only — typing needs an agreement with this number';
+    }
+
+    // Switch between free text and templates only. Typed text can't be sent
+    // without typing, so it's cleared; a whole chosen template is kept.
+    window.composerSetTyping = function (allowed) {
+        typingAllowed = allowed;
+        if (!allowed && hidden.value === '') body.value = '';
+        close();
+        refresh();
+        sync();
+    };
 
     // Enter or leave reply mode. reply = {id, snippet, groups}, or null to leave.
     // A template picked in the other mode isn't valid in this one, so it's
@@ -197,9 +248,11 @@
         snippet.textContent = reply ? reply.snippet : '';
         banner.classList.toggle('d-none', !reply);
 
-        body.disabled = replyOnly && !reply;
-        body.placeholder = reply ? placeholders.reply : (replyOnly ? placeholders.locked : placeholders.message);
+        // Without typing the body is a template from the other mode, not valid
+        // in this one, so it goes along with its id.
+        if (!typingAllowed && !restoring) body.value = '';
 
+        refresh();
         close();
         if (reply && !restoring) body.focus();
         sync();
@@ -213,8 +266,19 @@
         sync();
     });
 
+    // Templates only: the read-only box opens the full list instead of taking text.
+    body.addEventListener('click', () => {
+        if (!typingAllowed && !body.disabled) render('');
+    });
+
     body.addEventListener('keydown', e => {
-        if (menu.classList.contains('d-none')) return;
+        if (menu.classList.contains('d-none')) {
+            if (!typingAllowed && ['Enter', ' ', '/', 'ArrowDown'].includes(e.key)) {
+                e.preventDefault();
+                render('');
+            }
+            return;
+        }
         if (e.key === 'ArrowDown')      { e.preventDefault(); active = Math.min(active + 1, items.length - 1); highlight(); }
         else if (e.key === 'ArrowUp')   { e.preventDefault(); active = Math.max(active - 1, 0); highlight(); }
         else if (e.key === 'Enter' || e.key === 'Tab') {
@@ -240,6 +304,7 @@
 
         setReply(@json($initialReply), true);
     } else {
+        refresh();
         sync();
     }
 })();

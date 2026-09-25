@@ -35,6 +35,11 @@ class CannotSendMessage extends Exception
         return new self('This number cannot receive your message (blocked or DND).', 422);
     }
 
+    public static function typingNotAllowed(): self
+    {
+        return new self('Typing is not allowed with this number yet. Send a template, or ask for a typing agreement.', 422);
+    }
+
     // ── Replying ─────────────────────────────────────────────────────────
 
     public static function notOnTheReceivingSide(): self

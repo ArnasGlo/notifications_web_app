@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\CannotSendMessage;
+use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageTemplate;
 use App\Models\Number;
@@ -10,7 +11,7 @@ use App\Models\User;
 
 /**
  * The send sequence both MessageController@store methods used to duplicate:
- * sender ownership -> both numbers active -> blocking/DND -> busy routing.
+ * sender ownership -> both numbers active -> blocking/DND -> typing -> busy routing.
  *
  * Not a general service layer — just the orchestration that has two callers.
  * The entity predicates it leans on (Number::canReceiveFrom) stay on the model.
@@ -43,10 +44,16 @@ class SendMessage
             ? MessageTemplate::findOrFail($attributes['template_id'])
             : null;
 
-        // Both composers let the user edit an inserted template; contentFrom()
-        // decides whether the result is still that template or typed text, here
-        // rather than in either client.
-        return Message::create(Message::contentFrom($template, $attributes['body'] ?? null) + [
+        // contentFrom() decides whether the body is still exactly the template or
+        // typed text, here rather than in either client. Typed text — including
+        // an edited template — needs typing to be allowed between the numbers.
+        $content = Message::contentFrom($template, $attributes['body'] ?? null);
+
+        if (is_null($content['template_id']) && ! Conversation::typingAllowedBetween($sender, $receiver)) {
+            throw CannotSendMessage::typingNotAllowed();
+        }
+
+        return Message::create($content + [
             'sender_number_id' => $sender->id,
             'receiver_number_id' => $receiver->id,
             'status' => $receiver->user->status === 'busy' ? 'queued' : 'sent',

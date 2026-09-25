@@ -29,8 +29,9 @@ class ConversationReplyWebTest extends TestCase
     {
         $aliceUser = User::factory()->create($alice);
         $bob = User::factory()->create();
-        $aliceNumber = Number::factory()->for($aliceUser)->create();
-        $bobNumber = Number::factory()->for($bob)->create();
+        // Both allow typing, so typed replies reach the rules these tests check.
+        $aliceNumber = Number::factory()->for($aliceUser)->allowsTyping()->create();
+        $bobNumber = Number::factory()->for($bob)->allowsTyping()->create();
 
         $category = MessageCategory::factory()->create(['name' => 'Meeting']);
         $prompt = MessageTemplate::factory()->for($category, 'category')->create(['body' => 'Can you talk?']);

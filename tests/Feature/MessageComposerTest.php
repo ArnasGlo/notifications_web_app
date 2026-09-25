@@ -69,8 +69,8 @@ class MessageComposerTest extends TestCase
     public function test_composing_free_text_sends_without_a_template(): void
     {
         $user = User::factory()->create();
-        $sender = Number::factory()->for($user)->create();
-        $receiver = Number::factory()->create();
+        $sender = Number::factory()->for($user)->allowsTyping()->create();
+        $receiver = Number::factory()->allowsTyping()->create();
 
         $response = $this->actingAs($user)
             ->from(route('messages.compose'))
@@ -94,8 +94,8 @@ class MessageComposerTest extends TestCase
         // The hidden template_id survives edits in the browser; the server is what
         // decides the body is no longer that template.
         $user = User::factory()->create();
-        $sender = Number::factory()->for($user)->create();
-        $receiver = Number::factory()->create();
+        $sender = Number::factory()->for($user)->allowsTyping()->create();
+        $receiver = Number::factory()->allowsTyping()->create();
         $template = MessageTemplate::factory()
             ->for(MessageCategory::factory()->create(), 'category')
             ->create(['body' => 'Call me back']);

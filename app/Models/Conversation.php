@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Exceptions\TypingAgreementRefused;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -44,6 +45,11 @@ class Conversation extends Model
         return $this->hasOne(Message::class)->latestOfMany();
     }
 
+    public function typingAgreement()
+    {
+        return $this->hasOne(TypingAgreement::class);
+    }
+
     // ── Identity ─────────────────────────────────────────────────────────────
 
     /**
@@ -54,10 +60,22 @@ class Conversation extends Model
      */
     public static function between(int $numberA, int $numberB): self
     {
-        return static::firstOrCreate([
+        return static::firstOrCreate(static::pair($numberA, $numberB));
+    }
+
+    /** The conversation between two numbers, or null if they have never talked. */
+    public static function findBetween(int $numberA, int $numberB): ?self
+    {
+        return static::where(static::pair($numberA, $numberB))->first();
+    }
+
+    /** @return array{number_one_id: int, number_two_id: int} */
+    private static function pair(int $numberA, int $numberB): array
+    {
+        return [
             'number_one_id' => min($numberA, $numberB),
             'number_two_id' => max($numberA, $numberB),
-        ]);
+        ];
     }
 
     // ── Access ───────────────────────────────────────────────────────────────
@@ -104,7 +122,7 @@ class Conversation extends Model
      */
     public function scopeWithListData(Builder $query, Collection $accessibleIds): Builder
     {
-        return $query->with(['numberOne', 'numberTwo', 'latestMessage'])
+        return $query->with(['numberOne', 'numberTwo', 'latestMessage', 'typingAgreement'])
             ->withCount(['messages as unread_count' => function ($q) use ($accessibleIds) {
                 $q->whereIn('receiver_number_id', $accessibleIds)->where('status', 'sent');
             }]);
@@ -176,5 +194,153 @@ class Conversation extends Model
         // The viewer owns both ends: myNumberFor() picks number one, so the
         // counterpart is number two.
         return $this->numberTwo;
+    }
+
+    // ── Typing agreement ─────────────────────────────────────────────────────
+    // Templates are the default; free text needs typing to be allowed between
+    // the two numbers. It is allowed automatically when both numbers allow
+    // typing, or by an explicit agreement one owner requested and the other's
+    // owner accepted (at once, if their number allows typing). SendMessage and
+    // ReplyToMessage enforce it; both clients read typingStateFor().
+
+    /** Whether free text may pass between two numbers, before any conversation exists too. */
+    public static function typingAllowedBetween(Number $numberA, Number $numberB): bool
+    {
+        if ($numberA->allow_typing && $numberB->allow_typing) {
+            return true;
+        }
+
+        return (bool) static::findBetween($numberA->id, $numberB->id)?->typingAgreement?->isAccepted();
+    }
+
+    /** Both numbers allow typing: active with no agreement, and it can't be removed. */
+    public function typingIsAutomatic(): bool
+    {
+        return $this->numberOne->allow_typing && $this->numberTwo->allow_typing;
+    }
+
+    public function allowsTyping(): bool
+    {
+        return $this->typingIsAutomatic() || (bool) $this->typingAgreement?->isAccepted();
+    }
+
+    /**
+     * The typing state as one viewer sees it, including what they may do about it.
+     * Only the owner of the viewer's side may request, accept or remove.
+     *
+     * @return array{status: string, automatic: bool, requested_by_me: bool|null, can_request: bool, can_accept: bool, can_remove: bool}
+     */
+    public function typingStateFor(?Number $myNumber, User $viewer): array
+    {
+        $agreement = $this->typingAgreement;
+        $automatic = $this->typingIsAutomatic();
+
+        $status = match (true) {
+            $automatic || (bool) $agreement?->isAccepted() => 'active',
+            ! is_null($agreement) => 'pending',
+            default => 'none',
+        };
+
+        $requestedByMe = $status === 'pending'
+            ? $agreement->requested_by_number_id === $myNumber?->id
+            : null;
+
+        $manages = $myNumber?->user_id === $viewer->id;
+
+        return [
+            'status' => $status,
+            'automatic' => $automatic,
+            'requested_by_me' => $requestedByMe,
+            'can_request' => $manages && $status === 'none',
+            'can_accept' => $manages && $status === 'pending' && ! $requestedByMe,
+            'can_remove' => $manages && ! is_null($agreement) && ! $automatic,
+        ];
+    }
+
+    /**
+     * Ask the other side to allow typing. A number that allows typing accepts
+     * incoming requests automatically, so the agreement may be active at once.
+     *
+     * @throws TypingAgreementRefused
+     */
+    public function requestTyping(User $actor): TypingAgreement
+    {
+        $mine = $this->ownedSideFor($actor);
+
+        if ($this->allowsTyping()) {
+            throw TypingAgreementRefused::alreadyActive();
+        }
+
+        if ($this->typingAgreement) {
+            throw TypingAgreementRefused::alreadyRequested();
+        }
+
+        $theirs = $mine->is($this->numberOne) ? $this->numberTwo : $this->numberOne;
+
+        $agreement = $this->typingAgreement()->create([
+            'requested_by_number_id' => $mine->id,
+            'accepted_at' => $theirs->allow_typing ? now() : null,
+        ]);
+
+        $this->setRelation('typingAgreement', $agreement);
+
+        return $agreement;
+    }
+
+    /**
+     * Accept a request the other side sent.
+     *
+     * @throws TypingAgreementRefused
+     */
+    public function acceptTyping(User $actor): void
+    {
+        $mine = $this->ownedSideFor($actor);
+        $agreement = $this->typingAgreement;
+
+        if (! $agreement || $agreement->isAccepted() || $agreement->requested_by_number_id === $mine->id) {
+            throw TypingAgreementRefused::nothingToAccept();
+        }
+
+        $agreement->update(['accepted_at' => now()]);
+    }
+
+    /**
+     * Cancel a request, decline one, or end an active agreement — all the same
+     * act of removing it, open to either owner. An automatic agreement has no
+     * row to remove: it lasts while both numbers allow typing.
+     *
+     * @throws TypingAgreementRefused
+     */
+    public function removeTyping(User $actor): void
+    {
+        $this->ownedSideFor($actor);
+
+        if ($this->typingIsAutomatic()) {
+            throw TypingAgreementRefused::automatic();
+        }
+
+        if (! $this->typingAgreement) {
+            throw TypingAgreementRefused::nothingToRemove();
+        }
+
+        $this->typingAgreement->delete();
+        $this->setRelation('typingAgreement', null);
+    }
+
+    /**
+     * The side of this thread the actor owns. Assistants can type once typing is
+     * allowed, but managing it is the owner's, as with blocks and delegates.
+     *
+     * @throws TypingAgreementRefused
+     */
+    private function ownedSideFor(User $actor): Number
+    {
+        foreach ([$this->numberOne, $this->numberTwo] as $number) {
+            if ($number->user_id === $actor->id) {
+                return $number;
+            }
+        }
+
+        throw TypingAgreementRefused::notTheOwner();
     }
 }

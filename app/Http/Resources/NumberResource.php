@@ -18,6 +18,7 @@ class NumberResource extends JsonResource
             'country' => $this->country,
             'city' => $this->city,
             'status' => $this->status,
+            'allow_typing' => (bool) $this->allow_typing,
             'share_token' => $this->share_token,
             'created_at' => $this->created_at,
         ];

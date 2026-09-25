@@ -11,6 +11,7 @@ use App\Http\Controllers\ConversationController;
 use App\Http\Controllers\DelegateController;
 use App\Http\Controllers\FavoriteController;
 use App\Http\Controllers\InviteController;
+use App\Http\Controllers\TypingAgreementController;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Route;
 
@@ -47,6 +48,12 @@ Route::middleware('auth')->group(function () {
         Route::get('messages/updates', [ConversationController::class, 'listUpdates'])->name('messages.updates');
         Route::get('conversations/{conversation}/updates', [ConversationController::class, 'updates'])->name('conversations.updates');
     });
+
+    // Typing agreements: the chat page's buttons, and the compose page's check.
+    Route::post('conversations/{conversation}/typing', [TypingAgreementController::class, 'store'])->name('conversations.typing.store');
+    Route::post('conversations/{conversation}/typing/accept', [TypingAgreementController::class, 'accept'])->name('conversations.typing.accept');
+    Route::delete('conversations/{conversation}/typing', [TypingAgreementController::class, 'destroy'])->name('conversations.typing.destroy');
+    Route::get('messages/typing', [TypingAgreementController::class, 'allowed'])->name('messages.typing');
 
     Route::get('messages/compose', [MessageController::class, 'compose'])->name('messages.compose');
     Route::post('messages', [MessageController::class, 'store'])->name('messages.store');

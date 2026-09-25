@@ -90,6 +90,7 @@ class ConversationController extends Controller
         $myNumber = $conversation->myNumberFor($accessibleIds);
 
         return view('conversations.show', [
+            'typing' => $conversation->typingStateFor($myNumber, auth()->user()),
             'conversation' => $conversation,
             'messages' => $messages,
             'myNumber' => $myNumber,
@@ -132,7 +133,10 @@ class ConversationController extends Controller
     // equivalents live in Api\ConversationController and share the model methods
     // below them — only the trigger would change if this ever becomes push.
 
-    /** New messages in one open thread, as rendered bubbles. */
+    /**
+     * New messages in one open thread, as rendered bubbles, plus the typing
+     * state so a request or an acceptance reaches the open page too.
+     */
     public function updates(Request $request, Conversation $conversation)
     {
         abort_unless($conversation->isAccessibleBy(auth()->user()), 403);
@@ -160,8 +164,26 @@ class ConversationController extends Controller
                 ])->render(),
             ])->values(),
             'last_id' => $messages->max('id') ?? $afterId,
+            'typing' => $this->renderedTyping($conversation, $accessibleIds),
             'server_time' => now()->toIso8601String(),
         ]);
+    }
+
+    /** @return array{allowed: bool, state: string, html: string} */
+    private function renderedTyping(Conversation $conversation, Collection $accessibleIds): array
+    {
+        $typing = $conversation->typingStateFor($conversation->myNumberFor($accessibleIds), auth()->user());
+
+        return [
+            'allowed' => $typing['status'] === 'active',
+            // What the page compares against the bar's data-state to spot a change.
+            'state' => json_encode($typing),
+            'html' => view('partials.typing-agreement', [
+                'conversation' => $conversation,
+                'typing' => $typing,
+                'counterpart' => $conversation->counterpartFor($accessibleIds),
+            ])->render(),
+        ];
     }
 
     /** Threads whose activity moved since the list was last synced, as rendered rows. */

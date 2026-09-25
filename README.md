@@ -24,7 +24,8 @@ Built during a professional internship at **UAB Getweb** (Vilnius, Lithuania). T
 **Conversations & messaging**
 - Messages are grouped into conversations — one thread per pair of numbers, ordered by latest activity, with a message preview and an unread badge per row
 - The chat page shows the full history (replies included) with date separators, outbound/inbound bubbles and sent/read/queued ticks
-- Free-text composer with pre-written templates: press `/` to search saved replies, insert one, then edit it before sending
+- Templated messaging by default: press `/` to pick from pre-written templates
+- Typing agreements: free text (including edited templates) needs typing to be allowed between the two numbers — automatically when both numbers have "Allow typing in chat" on, otherwise by a request the other number's owner accepts (at once if their number allows typing); either owner can remove it
 - Filter the conversation list by an exact number, or jump straight to a thread from the quick-jump menu
 - Opening a thread marks every inbound message in it as read
 
@@ -140,6 +141,9 @@ A parallel, token-authenticated API exposes the same functionality for the plann
 | GET | `/api/conversations/{id}` | Full thread; marks inbound messages read |
 | GET | `/api/conversations/{id}/messages?after_id=` | Messages newer than a cursor (polling / push fetch) |
 | GET | `/api/conversations/updates?since=` | Threads whose activity moved since a server timestamp |
+| GET, POST, DELETE | `/api/conversations/{id}/typing` | Typing state; request an agreement; remove it |
+| POST | `/api/conversations/{id}/typing/accept` | Accept the other side's typing request |
+| GET | `/api/messages/typing` | Whether free text may be sent between two numbers |
 | GET, POST | `/api/messages` | Inbox (`?q=` filter); send |
 | GET, POST | `/api/messages/{id}[/reply]` | Read one message (marks it read); reply to it |
 | GET | `/api/numbers/{id}/messages` | Inbox scoped to a single number |

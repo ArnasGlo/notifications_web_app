@@ -107,7 +107,8 @@
                             <span class="badge bg-primary me-2">3</span> Write message
                         </h5>
 
-                        @include('partials.message-composer')
+                        {{-- Templates only until the recipient is known and checkTyping() says otherwise. --}}
+                        @include('partials.message-composer', ['typingAllowed' => false])
                     </div>
                 </div>
 
@@ -177,6 +178,9 @@ function selectSender(id, el) {
 
     setStepDone(1);
     setStepActive(2);
+
+    // A different sender can mean a different typing agreement.
+    if (document.getElementById('receiverNumberId').value) checkTyping();
 }
 
 // ── Step 2 ──────────────────────────────────────────────
@@ -202,8 +206,11 @@ async function lookupNumber() {
 
             setStepDone(2);
             setStepActive(3);
+
+            checkTyping();
         } else {
             document.getElementById('receiverNumberId').value = '';
+            window.composerSetTyping(false);
             feedback.innerHTML = '<span class="text-danger"><i class="fas fa-times-circle me-1"></i>Number not found on this platform.</span>';
         }
     } catch(e) {
@@ -215,6 +222,29 @@ async function lookupNumber() {
 document.getElementById('receiverInput').addEventListener('keydown', function(e) {
     if (e.key === 'Enter') { e.preventDefault(); lookupNumber(); }
 });
+
+// Free text is only offered where typing is allowed between the two numbers;
+// otherwise the composer takes whole templates only. The server enforces the
+// same rule, so a failed check just leaves templates only.
+async function checkTyping() {
+    const params = new URLSearchParams({
+        sender_number_id: document.getElementById('senderNumberId').value,
+        receiver_number_id: document.getElementById('receiverNumberId').value,
+    });
+
+    try {
+        const resp = await fetch(`{{ route('messages.typing') }}?${params}`, { headers: { Accept: 'application/json' } });
+        const data = resp.ok ? await resp.json() : { typing_allowed: false };
+        window.composerSetTyping(data.typing_allowed);
+    } catch (e) {
+        window.composerSetTyping(false);
+    }
+}
+
+// Coming back from a refused send with both numbers already chosen.
+if (document.getElementById('senderNumberId').value && document.getElementById('receiverNumberId').value) {
+    checkTyping();
+}
 
 // ── Step 3 ──────────────────────────────────────────────
 // The composer partial fires composer:changed on every edit, including when

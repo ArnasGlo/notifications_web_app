@@ -43,6 +43,7 @@ class NumberController extends Controller
             'country' => 'nullable|string|max:100',
             'city'    => 'nullable|string|max:100',
             'status'  => 'in:active,inactive',
+            'allow_typing' => 'boolean',
         ]));
         return redirect()->route('numbers.index')->with('success', 'Number updated.');
     }

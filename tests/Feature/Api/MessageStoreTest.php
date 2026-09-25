@@ -163,11 +163,12 @@ class MessageStoreTest extends TestCase
     // ── free text vs template ────────────────────────────────────────────
 
     /** @return array{0: User, 1: Number, 2: Number} */
+    /** Both numbers allow typing, so free text is accepted. */
     private function activePair(): array
     {
         $owner = User::factory()->create();
 
-        return [$owner, Number::factory()->for($owner)->create(), Number::factory()->create()];
+        return [$owner, Number::factory()->for($owner)->allowsTyping()->create(), Number::factory()->allowsTyping()->create()];
     }
 
     public function test_store_accepts_free_text_with_no_template(): void

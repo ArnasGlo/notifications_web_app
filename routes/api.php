@@ -9,6 +9,7 @@ use App\Http\Controllers\Api\InviteController;
 use App\Http\Controllers\Api\MessageController;
 use App\Http\Controllers\Api\NumberController;
 use App\Http\Controllers\Api\StatusController;
+use App\Http\Controllers\Api\TypingAgreementController;
 use Illuminate\Support\Facades\Route;
 
 /*
@@ -52,7 +53,14 @@ Route::middleware('auth:sanctum')->group(function () {
     Route::get('/conversations/{conversation}', [ConversationController::class, 'show']);
     Route::get('/conversations/{conversation}/messages', [ConversationController::class, 'messages'])->middleware('throttle:polling');
 
+    Route::get('/conversations/{conversation}/typing', [TypingAgreementController::class, 'show']);
+    Route::post('/conversations/{conversation}/typing', [TypingAgreementController::class, 'store']);
+    Route::post('/conversations/{conversation}/typing/accept', [TypingAgreementController::class, 'accept']);
+    Route::delete('/conversations/{conversation}/typing', [TypingAgreementController::class, 'destroy']);
+
     Route::get('/messages/compose-data', [MessageController::class, 'composeData']);
+    // Declared before /messages/{message}, like compose-data.
+    Route::get('/messages/typing', [TypingAgreementController::class, 'allowed']);
     Route::get('/messages', [MessageController::class, 'index']);
     Route::post('/messages', [MessageController::class, 'store']);
     Route::get('/messages/{message}', [MessageController::class, 'show']);

@@ -173,8 +173,8 @@ class ConversationWebTest extends TestCase
     public function test_the_chat_composer_sends_into_the_same_thread(): void
     {
         $owner = User::factory()->create();
-        $mine = Number::factory()->for($owner)->create();
-        $theirs = Number::factory()->create();
+        $mine = Number::factory()->for($owner)->allowsTyping()->create();
+        $theirs = Number::factory()->allowsTyping()->create();
         $existing = Message::factory()->create([
             'sender_number_id' => $theirs->id, 'receiver_number_id' => $mine->id,
         ]);

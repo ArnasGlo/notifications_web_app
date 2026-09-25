@@ -99,6 +99,8 @@
             </div>
 
             @if($myNumber && $counterpart)
+                @include('partials.typing-agreement', ['conversation' => $conversation, 'typing' => $typing, 'counterpart' => $counterpart])
+
                 <div class="card border-0 shadow-sm">
                     <div class="card-body p-3 p-md-4">
                         <form action="{{ route('messages.store') }}" method="POST">
@@ -110,6 +112,7 @@
                                 'replies' => true,
                                 'replyOnly' => $replyOnly,
                                 'replyingTo' => $replyingTo,
+                                'typingAllowed' => $typing['status'] === 'active',
                             ])
 
                             <div class="d-grid mt-3">
@@ -151,6 +154,13 @@ document.addEventListener('composer:changed', function (e) {
         url: @json(route('conversations.updates', $conversation)),
         params: () => ({ after_id: lastId }),
         onData(data) {
+            // Typing state: swap the bar and switch the composer when it changes.
+            const bar = document.getElementById('typingAgreement');
+            if (bar && bar.dataset.state !== data.typing.state) {
+                bar.outerHTML = data.typing.html;
+                window.composerSetTyping?.(data.typing.allowed);
+            }
+
             if (!data.messages.length) return;
 
             // Only auto-scroll if the reader is already at the bottom; yanking

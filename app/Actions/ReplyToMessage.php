@@ -3,6 +3,7 @@
 namespace App\Actions;
 
 use App\Exceptions\CannotSendMessage;
+use App\Models\Conversation;
 use App\Models\Message;
 use App\Models\MessageTemplate;
 use App\Models\User;
@@ -17,10 +18,10 @@ use App\Models\User;
  *  - Template replies skip the DND and block checks. Their content is
  *    admin-controlled — only answers mapped to the original prompt — so the
  *    original sender can't receive anything they didn't in effect ask for.
- *  - Free-text replies enforce DND and blocks. A message can be replied to any
- *    number of times, so an exempt free-text path would be an unlimited way to
- *    message someone who is on DND or has blocked you, and would make both
- *    unenforceable.
+ *  - Free-text replies need typing to be allowed between the two numbers, and
+ *    enforce DND and blocks. A message can be replied to any number of times,
+ *    so an exempt free-text path would be an unlimited way to message someone
+ *    who is on DND or has blocked you, and would make both unenforceable.
  *  - Every reply skips the busy queue and is stored as 'sent' — a documented
  *    asymmetry with SendMessage (ANDROID_APP_CONTEXT.md §3).
  */
@@ -39,6 +40,10 @@ class ReplyToMessage
 
         if (is_null($content['template_id'])) {
             // Free text: the original sender's number is the recipient here.
+            if (! Conversation::typingAllowedBetween($message->receiver, $message->sender)) {
+                throw CannotSendMessage::typingNotAllowed();
+            }
+
             if (! $message->sender->canReceiveFrom($message->receiver)) {
                 throw CannotSendMessage::undeliverable();
             }

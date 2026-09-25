@@ -10,13 +10,28 @@ class Number extends Model
 {
     use HasFactory;
 
-    protected $fillable = ['user_id', 'number', 'country', 'city', 'status', 'share_token'];
+    protected $fillable = ['user_id', 'number', 'country', 'city', 'status', 'allow_typing', 'share_token'];
+
+    protected $casts = ['allow_typing' => 'boolean'];
 
     protected static function boot()
     {
         parent::boot();
         static::creating(function ($number) {
             $number->share_token = (string) Str::uuid();
+        });
+
+        // A number that allows typing accepts typing requests automatically, so
+        // turning the setting on accepts the ones already waiting for it.
+        static::updated(function (Number $number) {
+            if ($number->wasChanged('allow_typing') && $number->allow_typing) {
+                TypingAgreement::whereNull('accepted_at')
+                    ->where('requested_by_number_id', '!=', $number->id)
+                    ->whereHas('conversation', fn ($q) => $q->where(fn ($pair) => $pair
+                        ->where('number_one_id', $number->id)
+                        ->orWhere('number_two_id', $number->id)))
+                    ->update(['accepted_at' => now()]);
+            }
         });
     }
 
@@ -54,6 +69,7 @@ class Number extends Model
         if ($this->user_id === $user->id) {
             return true;
         }
+
         return $this->delegates()->where('assistant_user_id', $user->id)->exists();
     }
 
@@ -82,6 +98,6 @@ class Number extends Model
             });
         })->exists();
 
-        return !$blocked;
+        return ! $blocked;
     }
 }

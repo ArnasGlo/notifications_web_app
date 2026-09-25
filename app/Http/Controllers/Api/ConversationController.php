@@ -82,7 +82,8 @@ class ConversationController extends Controller
      * Messages in one thread newer than the client's cursor.
      *
      * Marks inbound messages read, exactly as show() does — asking for the live
-     * end of an open thread is the same signal as opening it.
+     * end of an open thread is the same signal as opening it. Carries the typing
+     * state too, so an open thread sees a request or an acceptance on its next poll.
      */
     public function messages(ConversationMessagesRequest $request, Conversation $conversation)
     {
@@ -97,7 +98,10 @@ class ConversationController extends Controller
             ->get();
 
         return MessageResource::collection($messages)
-            ->additional(['meta' => ['server_time' => now()->toIso8601String()]]);
+            ->additional(['meta' => [
+                'server_time' => now()->toIso8601String(),
+                'typing' => $conversation->typingStateFor($conversation->myNumberFor($accessibleIds), $request->user()),
+            ]]);
     }
 
     /**
